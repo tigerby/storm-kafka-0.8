@@ -12,6 +12,7 @@
 
     <properties>
         <version.kafka>0.8.0-beta1</version.kafka>
+        <version.scala>2.9.2</version.scala>
         <version.storm>0.9.0-rc2</version.storm>
     </properties>
 
@@ -112,16 +113,35 @@
     </repositories>
 
     <dependencies>
+        <!--for kafka and its dependencies-->
         <dependency>
             <groupId>org.scala-lang</groupId>
             <artifactId>scala-library</artifactId>
-            <version>2.9.2</version>
+            <version>${version.scala}</version>
+        </dependency>
+        <dependency>
+            <groupId>log4j</groupId>
+            <artifactId>log4j</artifactId>
+            <version>1.2.17</version>
+        </dependency>
+        <dependency>
+            <groupId>com.yammer.metrics</groupId>
+            <artifactId>metrics-core</artifactId>
+            <version>2.2.0</version>
         </dependency>
         <dependency>
             <groupId>org.apache.kafka</groupId>
             <artifactId>kafka_2.9.2</artifactId>
             <version>${version.kafka}</version>
         </dependency>
+
+        <!--for kafka consumer groups-->
+        <!--<dependency>-->
+            <!--<groupId>com.101tec</groupId>-->
+            <!--<artifactId>zkclient</artifactId>-->
+            <!--<version>0.4</version>-->
+        <!--</dependency>-->
+
         <dependency>
             <groupId>storm</groupId>
             <artifactId>storm</artifactId>
