@@ -5,6 +5,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import kafka.javaapi.consumer.SimpleConsumer;
+import storm.kafka.trident.KafkaUtils;
 
 
 public class DynamicPartitionConnections {
@@ -31,7 +32,8 @@ public class DynamicPartitionConnections {
   public SimpleConsumer register(HostPort host, int partition) {
     if(!_connections.containsKey(host)) {
       // todo shouldn't client name be a topic and partition?
-      _connections.put(host, new ConnectionInfo(new SimpleConsumer(host.host, host.port, _config.socketTimeoutMs, _config.bufferSizeBytes, "cli" + host + "-" + partition)));
+      _connections.put(host, new ConnectionInfo(new SimpleConsumer(host.host, host.port, _config.socketTimeoutMs, _config.bufferSizeBytes,
+                                                                   KafkaUtils.makeClientName("cli-TOPICNAME-", partition))));
     }
     ConnectionInfo info = _connections.get(host);
     info.partitions.add(partition);
