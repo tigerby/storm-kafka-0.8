@@ -57,7 +57,7 @@ public class KafkaConfig implements Serializable {
   public int bufferSizeBytes = 1024 * 1024;
   public MultiScheme scheme = new RawMultiScheme();
   public String topic;
-  public long startOffsetTime = -2;
+  public long startOffsetTime = EALIST_TIME;
   public boolean forceFromStart = false;
 
   public KafkaConfig(BrokerHosts hosts, String topic) {
