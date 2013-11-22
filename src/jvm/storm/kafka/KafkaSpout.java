@@ -194,45 +194,4 @@ public class KafkaSpout extends BaseRichSpout {
     }
   }
 
-  public static void main(String[] args) {
-    TopologyBuilder builder = new TopologyBuilder();
-
-    List<String> hosts = new ArrayList<String>();
-    hosts.add("daisy06");
-    hosts.add("daisy07");
-    hosts.add("daisy08");
-    KafkaConfig.StaticHosts staticHosts = KafkaConfig.StaticHosts.fromHostString(hosts, 5);
-    SpoutConfig spoutConf = new SpoutConfig(
-        staticHosts,
-//        5,
-        "ips",
-        "/kafka",
-        "cli-storm"
-    );
-
-    spoutConf.zkServers = new ArrayList<String>() {{
-      add("daisy01:2181");
-      add("daisy02:2181");
-      add("daisy03:2181");
-      add("daisy04:2181");
-      add("daisy05:2181");
-    }};
-    spoutConf.zkPort = 2181;
-
-
-    spoutConf.scheme = new SchemeAsMultiScheme(new StringScheme());
-    spoutConf.forceStartOffsetTime(KafkaConfig.EALIST_TIME);
-    KafkaSpout spout = new KafkaSpout(spoutConf);
-
-
-    builder.setSpout("spout", spout);
-
-    Config conf = new Config();
-    //conf.setDebug(true);
-
-    LocalCluster cluster = new LocalCluster();
-    cluster.submitTopology("kafka-test", conf, builder.createTopology());
-
-    Utils.sleep(600000);
-  }
 }
