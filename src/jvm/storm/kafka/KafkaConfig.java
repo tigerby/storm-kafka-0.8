@@ -8,7 +8,7 @@ import backtype.storm.spout.MultiScheme;
 import backtype.storm.spout.RawMultiScheme;
 
 public class KafkaConfig implements Serializable {
-  public static final long EALIST_TIME = kafka.api.OffsetRequest.EarliestTime();     // -2
+  public static final long EARLIST_TIME = kafka.api.OffsetRequest.EarliestTime();     // -2
   public static final long LATEST_TIME = kafka.api.OffsetRequest.LatestTime();       // -1
 
   public static interface BrokerHosts extends Serializable {
@@ -29,6 +29,17 @@ public class KafkaConfig implements Serializable {
 
     public static StaticHosts fromHostString(List<String> hostStrings, int partitionsPerHost) {
       return new StaticHosts(convertHosts(hostStrings), partitionsPerHost);
+    }
+
+    public HostPort valueOf(String host, int port) {
+      for(HostPort hp: hosts) {
+        if(hp.host.equals(host) && hp.port == port) {
+          return hp;
+        }
+      }
+      HostPort newHP = new HostPort(host, port);
+      hosts.add(newHP);
+      return newHP;
     }
 
     public StaticHosts(List<HostPort> hosts, int partitionsPerHost) {
@@ -57,7 +68,7 @@ public class KafkaConfig implements Serializable {
   public int bufferSizeBytes = 1024 * 1024;
   public MultiScheme scheme = new RawMultiScheme();
   public String topic;
-  public long startOffsetTime = EALIST_TIME;
+  public long startOffsetTime = EARLIST_TIME;
   public boolean forceFromStart = false;
 
   public KafkaConfig(BrokerHosts hosts, String topic) {

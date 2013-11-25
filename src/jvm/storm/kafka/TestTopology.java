@@ -53,10 +53,11 @@ public class TestTopology {
     spoutConf.zkPort = 2181;
 
     spoutConf.scheme = new SchemeAsMultiScheme(new StringScheme());
-    spoutConf.forceStartOffsetTime(KafkaConfig.EALIST_TIME);
+    spoutConf.forceStartOffsetTime(KafkaConfig.EARLIST_TIME);
+
     KafkaSpout spout = new KafkaSpout(spoutConf);
 
-    builder.setSpout("kafka-spout", spout);
+    builder.setSpout("kafka-spout", spout, 5);
     builder.setBolt("print-bolt", new PrinterBolt(), 1)
         .shuffleGrouping("kafka-spout");
 
