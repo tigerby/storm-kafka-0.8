@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import kafka.cluster.Broker;
 import kafka.javaapi.PartitionMetadata;
 import kafka.javaapi.TopicMetadata;
 import kafka.javaapi.TopicMetadataRequest;
@@ -21,43 +22,27 @@ public class StaticCoordinator implements PartitionCoordinator {
 
   Map<GlobalPartitionId, PartitionManager> managers =
       new HashMap<GlobalPartitionId, PartitionManager>();
-  List<String> replicaBrokers = new ArrayList<String>();
 
+  // TODO: integrate parallelism of Storm with partition of Kafka.
   public StaticCoordinator(DynamicPartitionConnections connections, Map stormConf,
                            SpoutConfig config, ZkState state, int taskIndex, int totalTasks,
                            String topologyInstanceId) {
-//    StaticHosts hosts = (StaticHosts) config.hosts;
-//    List<GlobalPartitionId> allPartitionIds = new ArrayList();
-//    for (HostPort h : hosts.hosts) {
-//      for (int i = 0; i < hosts.partitionsPerHost; i++) {
-//        allPartitionIds.add(new GlobalPartitionId(h, i));
-//      }
-//    }
-//    for (int i = taskIndex; i < allPartitionIds.size(); i += totalTasks) {
-//      GlobalPartitionId myPartition = allPartitionIds.get(i);
-//      managers.put(myPartition,
-//                    new PartitionManager(connections, topologyInstanceId, state, stormConf, config,
-//                                         myPartition));
-//
-//    }
-
     StaticHosts hosts = (StaticHosts) config.hosts;
 
     for (int i = 0; i < hosts.partitionsPerHost; i++) {
-      HostPort hp = hosts.hosts.get(0);
-      String seed = hp.host;
-
-      PartitionMetadata metadata = findLeader(seed, hp.port, config.topic, i);
+      PartitionMetadata metadata = findLeader(hosts.hosts, config.topic, i);
       HostPort hostPort = hosts.valueOf(metadata.leader().host(), metadata.leader().port());
+      List<HostPort> replicas = new ArrayList<HostPort>();
+      for(Broker broker: metadata.replicas()) {
+        HostPort replica = hosts.valueOf(broker.host(), broker.port());
+        replicas.add(replica);
 
       GlobalPartitionId myPartition = new GlobalPartitionId(hostPort, metadata.partitionId());
       managers.put(new GlobalPartitionId(hostPort, metadata.partitionId()),
                    new PartitionManager(connections, topologyInstanceId, state, stormConf, config,
-                                        myPartition));
-
-      replicaBrokers = replicas(metadata);
+                                        myPartition, replicas));
+      }
     }
-
   }
 
   @Override
@@ -69,21 +54,14 @@ public class StaticCoordinator implements PartitionCoordinator {
     return managers.get(id);
   }
 
-  private static PartitionMetadata findLeader(String seedBroker, int port,
-                                              String topic, int partition) {
-    ArrayList<String> brokerList = new ArrayList<String>();
-    brokerList.add(seedBroker);
 
-    return findLeader(brokerList, port, topic, partition);
-  }
-
-  private static PartitionMetadata findLeader(List<String> seedBrokers, int port,
-                                              String topic, int partition) {
+  public static PartitionMetadata findLeader(List<HostPort> seedBrokers, String topic, int partition) {
     PartitionMetadata returnMetaData = null;
-    for (String seed : seedBrokers) {
+    for (HostPort seed : seedBrokers) {
       SimpleConsumer consumer = null;
       try {
-        consumer = new SimpleConsumer(seed, port, 100000, 64 * 1024, "leaderLookup");
+        // TODO: property meta data.
+        consumer = new SimpleConsumer(seed.host, seed.port, 100000, 64 * 1024, "leaderLookup");
         List<String> topics = new ArrayList<String>();
         topics.add(topic);
         TopicMetadataRequest req = new TopicMetadataRequest(topics);
@@ -119,29 +97,22 @@ public class StaticCoordinator implements PartitionCoordinator {
     return replicaBrokers;
   }
 
-  private static String findNewLeader(List<String> m_replicaBrokers, String a_oldLeader,
-                                      String a_topic, int a_partition, int a_port)
-      throws Exception {
+  public static HostPort findNewLeader(List<HostPort> replicaBrokers, HostPort oldLeader, String topic, int partition) {
+    // TODO: property retry count.
     for (int i = 0; i < 3; i++) {
-      boolean goToSleep = false;
-      PartitionMetadata metadata = findLeader(m_replicaBrokers, a_port, a_topic, a_partition);
-      if (metadata == null) {
-        goToSleep = true;
-      } else if (metadata.leader() == null) {
-        goToSleep = true;
-      } else if (a_oldLeader.equalsIgnoreCase(metadata.leader().host()) && i == 0) {
+      PartitionMetadata metadata = findLeader(replicaBrokers, topic, partition);
+      if(metadata != null && metadata.leader() != null) {
+        break;
+      }
+      if (!oldLeader.host.equalsIgnoreCase(metadata.leader().host()) || i != 0) {
         // first time through if the leader hasn't changed give ZooKeeper a second to recover
         // second time, assume the broker did recover before failover, or it was a non-Broker issue
-        //
-        goToSleep = true;
-      } else {
-        return metadata.leader().host();
+        return new HostPort(metadata.leader().host(), metadata.leader().port());
       }
-      if (goToSleep) {
-        try {
-          Thread.sleep(1000);
-        } catch (InterruptedException ie) {
-        }
+
+      try {
+        Thread.sleep(1000);
+      } catch (InterruptedException ie) {
       }
     }
     throw new RuntimeException("Unable to find new leader after Broker failure. Exiting");

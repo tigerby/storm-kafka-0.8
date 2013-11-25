@@ -12,7 +12,7 @@ public class KafkaConfig implements Serializable {
   public static final long LATEST_TIME = kafka.api.OffsetRequest.LatestTime();       // -1
 
   public static interface BrokerHosts extends Serializable {
-
+    HostPort valueOf(String host, int port);
   }
 
   public static class StaticHosts implements BrokerHosts {
@@ -24,7 +24,7 @@ public class KafkaConfig implements Serializable {
       return ((StaticHosts) hosts).hosts.size();
     }
 
-    public List<HostPort> hosts;
+    public final List<HostPort> hosts;
     public int partitionsPerHost;
 
     public static StaticHosts fromHostString(List<String> hostStrings, int partitionsPerHost) {
@@ -37,9 +37,7 @@ public class KafkaConfig implements Serializable {
           return hp;
         }
       }
-      HostPort newHP = new HostPort(host, port);
-      hosts.add(newHP);
-      return newHP;
+      throw new RuntimeException("invalid host/port: " + host + ", " + port);
     }
 
     public StaticHosts(List<HostPort> hosts, int partitionsPerHost) {
@@ -58,6 +56,11 @@ public class KafkaConfig implements Serializable {
     public ZkHosts(String brokerZkStr, String brokerZkPath) {
       this.brokerZkStr = brokerZkStr;
       this.brokerZkPath = brokerZkPath;
+    }
+
+    @Override
+    public HostPort valueOf(String host, int port) {
+      return null;  //To change body of implemented methods use File | Settings | File Templates.
     }
   }
 
