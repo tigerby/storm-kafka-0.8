@@ -15,7 +15,6 @@ import kafka.javaapi.TopicMetadataRequest;
 import kafka.javaapi.consumer.SimpleConsumer;
 import storm.kafka.KafkaConfig.StaticHosts;
 
-// TODO: find new leader when state is obsolete and update PartitionManager.
 public class StaticCoordinator implements PartitionCoordinator {
 
   public static final Logger LOG = LoggerFactory.getLogger(StaticCoordinator.class);
@@ -32,16 +31,18 @@ public class StaticCoordinator implements PartitionCoordinator {
     for (int i = 0; i < hosts.partitionsPerHost; i++) {
       PartitionMetadata metadata = findLeader(hosts.hosts, config.topic, i);
       HostPort hostPort = hosts.valueOf(metadata.leader().host(), metadata.leader().port());
+
       List<HostPort> replicas = new ArrayList<HostPort>();
       for(Broker broker: metadata.replicas()) {
         HostPort replica = hosts.valueOf(broker.host(), broker.port());
         replicas.add(replica);
+      }
 
       GlobalPartitionId myPartition = new GlobalPartitionId(hostPort, metadata.partitionId());
       managers.put(new GlobalPartitionId(hostPort, metadata.partitionId()),
                    new PartitionManager(connections, topologyInstanceId, state, stormConf, config,
                                         myPartition, replicas));
-      }
+
     }
   }
 

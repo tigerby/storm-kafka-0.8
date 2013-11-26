@@ -33,31 +33,34 @@ public class TestTopology {
     TopologyBuilder builder = new TopologyBuilder();
 
     List<String> hosts = new ArrayList<String>();
-    hosts.add("tiger01");
-    hosts.add("tiger02");
-    hosts.add("tiger03");
-    KafkaConfig.StaticHosts staticHosts = KafkaConfig.StaticHosts.fromHostString(hosts, 5);
+    hosts.add("daisy11:9091");
+    hosts.add("daisy11:9092");
+    hosts.add("daisy12:9093");
+    hosts.add("daisy12:9094");
+    KafkaConfig.StaticHosts staticHosts = KafkaConfig.StaticHosts.fromHostString(hosts, 1);
     SpoutConfig spoutConf = new SpoutConfig(
         staticHosts,
 //        5,
-        "ips",
+        "cdrTopic",
         "/storm-kafka-test",
         "cli-storm"
     );
 
-    spoutConf.zkServers = new ArrayList<String>() {{
-      add("tiger01");
-      add("tiger02");
-      add("tiger03");
-    }};
-    spoutConf.zkPort = 2181;
+//    spoutConf.zkServers = new ArrayList<String>() {{
+//      add("daisy01");
+//      add("daisy02");
+//      add("daisy03");
+//      add("daisy04");
+//      add("daisy05");
+//    }};
+//    spoutConf.zkPort = 2181;
 
     spoutConf.scheme = new SchemeAsMultiScheme(new StringScheme());
     spoutConf.forceStartOffsetTime(KafkaConfig.EARLIST_TIME);
 
     KafkaSpout spout = new KafkaSpout(spoutConf);
 
-    builder.setSpout("kafka-spout", spout, 5);
+    builder.setSpout("kafka-spout", spout, 1);
     builder.setBolt("print-bolt", new PrinterBolt(), 1)
         .shuffleGrouping("kafka-spout");
 

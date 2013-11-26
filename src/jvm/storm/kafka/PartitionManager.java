@@ -90,19 +90,19 @@ public class PartitionManager {
       _committedTo =
           getLastOffset(_consumer, spoutConfig.topic, id.partition, spoutConfig.startOffsetTime,
                         "cli-" + spoutConfig.topic + "-" + id.partition);
-      LOG.info("Using startOffsetTime to choose last commit offset.");
+      LOG.info("Init offset: [{}] Using startOffsetTime to choose last commit offset {}.", partitionId, _committedTo);
     } else if (jsonTopologyId == null || jsonOffset == null) { // failed to parse JSON?
       _committedTo =
           getLastOffset(_consumer, spoutConfig.topic, id.partition,
                         kafka.api.OffsetRequest.LatestTime(),
                         "cli-" + spoutConfig.topic + "-" + id.partition);
-      LOG.info("Setting last commit offset to HEAD.");
+      LOG.info("Init offset: [{}] Setting last commit offset to HEAD({}).", partitionId, _committedTo);
     } else {
       _committedTo = jsonOffset;
-      LOG.info("Read last commit offset from zookeeper: " + _committedTo);
+      LOG.info("Init offset: [{}] Read last commit offset from zookeeper: {}", partitionId, _committedTo);
     }
 
-    LOG.info("Starting Kafka {}:{} from offset ", _consumer.host(), id.partition, _committedTo);
+    LOG.info("Starting Kafka {} from offset {}", partitionId, _committedTo);
     _emittedToOffset = _committedTo;
 
     _fetchAPILatencyMax = new CombinedMetric(new MaxMetric());
@@ -149,15 +149,14 @@ public class PartitionManager {
       boolean stats = false;
       // TODO: property number.retry
       while (!stats && numOfError < 5) {
-        LOG.info("Fetching from Kafka: {}:{} from offset {}. try: {}", _consumer.host(),
-                 partitionId.partition,
-                 _emittedToOffset, numOfError + 1);
+        LOG.info("Fetching from Kafka: {} from offset {}. retry: {}", partitionId,
+                 _emittedToOffset, numOfError);
         stats = fill();
         numOfError++;
       }
 
       if (numOfError > 5) {
-        throw new RuntimeException("CANNOT find leader. partition: " + partitionId.partition);
+        throw new RuntimeException("CANNOT find leader. partition: {}" + partitionId);
       }
 
     }
@@ -196,7 +195,7 @@ public class PartitionManager {
 
     if (fetchResponse.hasError()) {
       short code = fetchResponse.errorCode(_spoutConfig.topic, partitionId.partition);
-      LOG.error("Error fetching data from the Broker: {}, Reason: {}", _consumer.host(), code);
+      LOG.error("Error fetching data from the Broker: {}, Reason: {}", partitionId, code);
 
 //      if (code == ErrorMapping.OffsetOutOfRangeCode()) {
 //        // TODO: what I have to do when offset if invalid.
@@ -230,8 +229,7 @@ public class PartitionManager {
     _fetchAPIMessageCount.incrBy(numMessages);
 
     if (numMessages > 0) {
-      LOG.info("Fetched " + numMessages + " byte messages from Kafka: " + _consumer.host() + ":"
-               + partitionId.partition);
+      LOG.info("Fetched {} byte messages from Kafka: {}", numMessages, partitionId);
     }
     for (MessageAndOffset messageAndOffset : messageAndOffsets) {
       long currentOffset = messageAndOffset.offset();
@@ -247,8 +245,7 @@ public class PartitionManager {
       _emittedToOffset = messageAndOffset.offset();
     }
     if (numMessages > 0) {
-      LOG.info("Added " + numMessages + " byte messages from Kafka: " + _consumer.host() + ":"
-               + partitionId.partition + " to internal buffers");
+      LOG.info("Added {} byte messages from Kafka: {} to internal buffers", numMessages, partitionId);
     }
     return true;
   }
@@ -267,7 +264,7 @@ public class PartitionManager {
   }
 
   public void commit() {
-    LOG.info("Committing offset for {}", partitionId);
+    LOG.info("Committing offset {} for {}", _committedTo, partitionId);
     long committedTo;
     if (_pending.isEmpty()) {
       committedTo = _emittedToOffset;
