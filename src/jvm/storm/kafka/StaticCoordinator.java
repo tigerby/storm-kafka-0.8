@@ -22,14 +22,21 @@ public class StaticCoordinator implements PartitionCoordinator {
   Map<GlobalPartitionId, PartitionManager> managers =
       new HashMap<GlobalPartitionId, PartitionManager>();
 
-  // TODO: integrate parallelism of Storm with partition of Kafka.
   public StaticCoordinator(DynamicPartitionConnections connections, Map stormConf,
                            SpoutConfig config, ZkState state, int taskIndex, int totalTasks,
                            String topologyInstanceId) {
     StaticHosts hosts = (StaticHosts) config.hosts;
 
+    List<PartitionMetadata> allPartitionMetadata = new ArrayList<PartitionMetadata>();
     for (int i = 0; i < hosts.partitionsPerHost; i++) {
       PartitionMetadata metadata = findLeader(hosts.hosts, config.topic, i);
+      if(metadata != null) {
+        allPartitionMetadata.add(metadata);
+      }
+    }
+
+    for(int i=taskIndex; i<allPartitionMetadata.size(); i+=totalTasks) {
+      PartitionMetadata metadata = allPartitionMetadata.get(i);
       HostPort hostPort = hosts.valueOf(metadata.leader().host(), metadata.leader().port());
 
       List<HostPort> replicas = new ArrayList<HostPort>();
