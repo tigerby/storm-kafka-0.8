@@ -13,6 +13,7 @@ import kafka.api.FetchRequest;
 import kafka.api.FetchRequestBuilder;
 import kafka.api.OffsetRequest;
 import kafka.api.PartitionOffsetRequestInfo;
+import kafka.common.ErrorMapping;
 import kafka.common.TopicAndPartition;
 import kafka.javaapi.FetchResponse;
 import kafka.javaapi.OffsetResponse;
@@ -25,6 +26,7 @@ import org.slf4j.LoggerFactory;
 
 import storm.kafka.KafkaSpout.EmitState;
 import storm.kafka.KafkaSpout.MessageAndRealOffset;
+import storm.kafka.trident.KafkaUtils;
 import storm.kafka.trident.MaxMetric;
 
 public class PartitionManager {
@@ -199,14 +201,14 @@ public class PartitionManager {
       short code = fetchResponse.errorCode(_spoutConfig.topic, partitionId.partition);
       LOG.error("Error fetching data from the Broker: {}, Reason: {}", partitionId, code);
 
-//      if (code == ErrorMapping.OffsetOutOfRangeCode()) {
-//        // TODO: what I have to do when offset if invalid.
-//        // We asked for an invalid offset. For simple case ask for the last element to reset
-//        readOffset =
-//            getLastOffset(_consumer, _spoutConfig.topic, partitionId.partition, kafka.api.OffsetRequest.LatestTime(),
-//                          KafkaUtils.makeClientName(_spoutConfig.topic, partitionId.partition));
-//       return false;
-//      }
+      if (code == ErrorMapping.OffsetOutOfRangeCode()) {
+        // TODO: what I have to do when offset if invalid.
+        // We asked for an invalid offset. For simple case ask for the last element to reset
+        _emittedToOffset =
+            getLastOffset(_consumer, _spoutConfig.topic, partitionId.partition, kafka.api.OffsetRequest.LatestTime(),
+                          KafkaUtils.makeClientName(_spoutConfig.topic, partitionId.partition));
+       return false;
+      }
       _consumer.close();
 
       HostPort newLeader = StaticCoordinator
