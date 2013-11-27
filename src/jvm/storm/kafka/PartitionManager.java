@@ -90,16 +90,19 @@ public class PartitionManager {
       _committedTo =
           getLastOffset(_consumer, spoutConfig.topic, id.partition, spoutConfig.startOffsetTime,
                         "cli-" + spoutConfig.topic + "-" + id.partition);
-      LOG.info("Init offset: [{}] Using startOffsetTime to choose last commit offset {}.", partitionId, _committedTo);
+      LOG.info("Init offset: [{}] Using startOffsetTime to choose last commit offset {}.",
+               partitionId, _committedTo);
     } else if (jsonTopologyId == null || jsonOffset == null) { // failed to parse JSON?
       _committedTo =
           getLastOffset(_consumer, spoutConfig.topic, id.partition,
                         kafka.api.OffsetRequest.LatestTime(),
                         "cli-" + spoutConfig.topic + "-" + id.partition);
-      LOG.info("Init offset: [{}] Setting last commit offset to HEAD({}).", partitionId, _committedTo);
+      LOG.info("Init offset: [{}] Setting last commit offset to HEAD({}).", partitionId,
+               _committedTo);
     } else {
       _committedTo = jsonOffset;
-      LOG.info("Init offset: [{}] Read last commit offset from zookeeper: {}", partitionId, _committedTo);
+      LOG.info("Init offset: [{}] Read last commit offset from zookeeper: {}", partitionId,
+               _committedTo);
     }
 
     LOG.info("Starting Kafka {} from offset {}", partitionId, _committedTo);
@@ -125,7 +128,7 @@ public class PartitionManager {
     OffsetResponse response = consumer.getOffsetsBefore(request);
 
     if (response.hasError()) {
-      System.out.println("Error fetching data Offset Data the Broker. Reason: " + response
+      LOG.info("Error fetching data Offset Data the Broker. Reason: {}", response
           .errorCode(topic, partition));
       return 0;
     }
@@ -146,17 +149,16 @@ public class PartitionManager {
   public EmitState next(SpoutOutputCollector collector) {
     if (_waitingToEmit.isEmpty()) {
       int numOfError = 0;
-      boolean stats = false;
+
       // TODO: property number.retry
-      while (!stats && numOfError < 5) {
+      while (!fill()) {
+        numOfError++;
         LOG.info("Fetching from Kafka: {} from offset {}. retry: {}", partitionId,
                  _emittedToOffset, numOfError);
-        stats = fill();
-        numOfError++;
-      }
 
-      if (numOfError > 5) {
-        throw new RuntimeException("CANNOT find leader. partition: {}" + partitionId);
+        if (numOfError > 5) {
+          throw new RuntimeException("CANNOT find leader. partition: {}" + partitionId);
+        }
       }
 
     }
@@ -233,19 +235,19 @@ public class PartitionManager {
     }
     for (MessageAndOffset messageAndOffset : messageAndOffsets) {
       long currentOffset = messageAndOffset.offset();
-      // TODO: shouldn't check currentOffset and read offset?
-//      if (currentOffset < readOffset) {
-//        System.out.println("Found an old offset: " + currentOffset + " Expecting: " + readOffset);
-//        continue;
-//      }
-//      readOffset = messageAndOffset.nextOffset();
+
+      if (currentOffset < _emittedToOffset) {
+        LOG.info("Found an old offset: {} Expecting: {}", currentOffset, _emittedToOffset);
+        continue;
+      }
 
       _pending.add(_emittedToOffset);
       _waitingToEmit.add(new MessageAndRealOffset(messageAndOffset.message(), _emittedToOffset));
-      _emittedToOffset = messageAndOffset.offset();
+      _emittedToOffset = messageAndOffset.nextOffset();
     }
     if (numMessages > 0) {
-      LOG.info("Added {} byte messages from Kafka: {} to internal buffers", numMessages, partitionId);
+      LOG.info("Added {} byte messages from Kafka: {} to internal buffers", numMessages,
+               partitionId);
     }
     return true;
   }
