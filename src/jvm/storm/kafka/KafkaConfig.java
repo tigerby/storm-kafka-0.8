@@ -1,5 +1,8 @@
 package storm.kafka;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
@@ -8,14 +11,16 @@ import backtype.storm.spout.MultiScheme;
 import backtype.storm.spout.RawMultiScheme;
 
 public class KafkaConfig implements Serializable {
-  public static final long EARLIST_TIME = kafka.api.OffsetRequest.EarliestTime();     // -2
-  public static final long LATEST_TIME = kafka.api.OffsetRequest.LatestTime();       // -1
+  public static final long EARLIEST_TIME = kafka.api.OffsetRequest.EarliestTime();     // -2
+  public static final long LATEST_TIME = kafka.api.OffsetRequest.LatestTime();        // -1
 
   public static interface BrokerHosts extends Serializable {
     HostPort valueOf(String host, int port);
   }
 
   public static class StaticHosts implements BrokerHosts {
+
+    public static final Logger LOG = LoggerFactory.getLogger(StaticHosts.class);
 
     public static int getNumHosts(BrokerHosts hosts) {
       if (!(hosts instanceof StaticHosts)) {
@@ -37,7 +42,11 @@ public class KafkaConfig implements Serializable {
           return hp;
         }
       }
-      throw new RuntimeException("invalid host/port: " + host + ", " + port);
+
+      LOG.info("add new broker, {}:{}", host, port);
+      HostPort newOne = new HostPort(host, port);
+      hosts.add(newOne);
+      return newOne;
     }
 
     public StaticHosts(List<HostPort> hosts, int partitionsPerHost) {
@@ -71,7 +80,7 @@ public class KafkaConfig implements Serializable {
   public int bufferSizeBytes = 1024 * 1024;
   public MultiScheme scheme = new RawMultiScheme();
   public String topic;
-  public long startOffsetTime = EARLIST_TIME;
+  public long startOffsetTime = EARLIEST_TIME;
   public boolean forceFromStart = false;
 
   public KafkaConfig(BrokerHosts hosts, String topic) {

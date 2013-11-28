@@ -55,7 +55,7 @@ public class StaticCoordinator implements PartitionCoordinator {
 
   @Override
   public List<PartitionManager> getMyManagedPartitions() {
-    return new ArrayList(managers.values());
+    return new ArrayList<PartitionManager>(managers.values());
   }
 
   public PartitionManager getManager(GlobalPartitionId id) {
