@@ -32,35 +32,21 @@ public class TestTopology {
   public static void main(String[] args) {
     TopologyBuilder builder = new TopologyBuilder();
 
-    List<String> hosts = new ArrayList<String>();
-    hosts.add("daisy11:9091");
-    hosts.add("daisy11:9092");
-    hosts.add("daisy12:9093");
-    hosts.add("daisy12:9094");
-    KafkaConfig.StaticHosts staticHosts = KafkaConfig.StaticHosts.fromHostString(hosts, 1);
-    SpoutConfig spoutConf = new SpoutConfig(
-        staticHosts,
-//        5,
-        "cdrTopic",
-        "/storm-kafka-test",
-        "cli-storm"
-    );
+    KafkaConfig.StaticHosts staticHosts =
+        KafkaConfig.StaticHosts
+            .newInstance("daisy11:9091,daisy11:9092,daisy12:9093,daisy12:9094");
 
-//    spoutConf.zkServers = new ArrayList<String>() {{
-//      add("daisy01");
-//      add("daisy02");
-//      add("daisy03");
-//      add("daisy04");
-//      add("daisy05");
-//    }};
-//    spoutConf.zkPort = 2181;
-
-    spoutConf.scheme = new SchemeAsMultiScheme(new StringScheme());
-    spoutConf.forceStartOffsetTime(KafkaConfig.EARLIST_TIME);
+    SpoutConfig spoutConf =
+        new SpoutConfig.Builder(staticHosts, "ips", 5, "/storm-kafka-test", "cli-storm")
+            .zkServers(SpoutConfig.fromHostString("daisy01,daisy02,daisy03,daisy04,daisy05"))
+            .zkPort(2181)
+            .scheme(new SchemeAsMultiScheme(new StringScheme()))
+            .startOffsetTime(KafkaConfig.EARLIEST_TIME)
+            .build();
 
     KafkaSpout spout = new KafkaSpout(spoutConf);
 
-    builder.setSpout("kafka-spout", spout, 1);
+    builder.setSpout("kafka-spout", spout, 5);
     builder.setBolt("print-bolt", new PrinterBolt(), 1)
         .shuffleGrouping("kafka-spout");
 
@@ -76,7 +62,7 @@ public class TestTopology {
 //    public static void main(String [] args) throws Exception {
 //        List<String> hosts = new ArrayList<String>();
 //        hosts.add("localhost");
-//        KafkaConfig kafkaConf = new KafkaConfig(StaticHosts.fromHostString(hosts, 3), "test");
+//        KafkaConfig kafkaConf = new KafkaConfig(StaticHosts.newInstance(hosts, 3), "test");
 //        kafkaConf.scheme = new SchemeAsMultiScheme(new StringScheme());
 //        LocalCluster cluster = new LocalCluster();
 //        TransactionalTopologyBuilder builder = new TransactionalTopologyBuilder("id", "spout",
