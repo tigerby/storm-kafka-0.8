@@ -16,7 +16,8 @@ public class StaticBrokerReader implements IBrokerReader {
         for(HostPort hp: hosts.hosts) {
             List info = new ArrayList();
             info.add((long) hp.port);
-            info.add((long) hosts.partitionsPerHost);
+          // TODO: should be removed
+//            info.add((long) hosts.partitionsPerHost);
             brokers.put(hp.host, info);
         }
     }

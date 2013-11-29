@@ -28,7 +28,7 @@ public class StaticCoordinator implements PartitionCoordinator {
     StaticHosts hosts = (StaticHosts) config.hosts;
 
     List<PartitionMetadata> allPartitionMetadata = new ArrayList<PartitionMetadata>();
-    for (int i = 0; i < hosts.partitionsPerHost; i++) {
+    for (int i = 0; i < config.partitions; i++) {
       PartitionMetadata metadata = findLeader(hosts.hosts, config.topic, i);
       if(metadata != null) {
         allPartitionMetadata.add(metadata);

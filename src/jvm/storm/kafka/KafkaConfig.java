@@ -30,10 +30,13 @@ public class KafkaConfig implements Serializable {
     }
 
     public final List<HostPort> hosts;
-    public int partitionsPerHost;
 
-    public static StaticHosts fromHostString(List<String> hostStrings, int partitionsPerHost) {
-      return new StaticHosts(convertHosts(hostStrings), partitionsPerHost);
+    public static StaticHosts newInstance(List<String> hostList) {
+      return new StaticHosts(convertHosts(hostList));
+    }
+
+    public static StaticHosts newInstance(String hostStrings) {
+      return new StaticHosts(convertHosts(hostStrings));
     }
 
     public HostPort valueOf(String host, int port) {
@@ -49,9 +52,8 @@ public class KafkaConfig implements Serializable {
       return newOne;
     }
 
-    public StaticHosts(List<HostPort> hosts, int partitionsPerHost) {
+    public StaticHosts(List<HostPort> hosts) {
       this.hosts = hosts;
-      this.partitionsPerHost = partitionsPerHost;
     }
 
   }
@@ -75,17 +77,20 @@ public class KafkaConfig implements Serializable {
 
 
   public BrokerHosts hosts;
+  // TODO: property
   public int fetchSizeBytes = 1024 * 1024;
   public int socketTimeoutMs = 10000;
   public int bufferSizeBytes = 1024 * 1024;
   public MultiScheme scheme = new RawMultiScheme();
   public String topic;
+  public int partitions;
   public long startOffsetTime = EARLIEST_TIME;
   public boolean forceFromStart = false;
 
-  public KafkaConfig(BrokerHosts hosts, String topic) {
+  public KafkaConfig(BrokerHosts hosts, String topic, int partitions) {
     this.hosts = hosts;
     this.topic = topic;
+    this.partitions = partitions;
   }
 
 
@@ -97,6 +102,24 @@ public class KafkaConfig implements Serializable {
   public static List<HostPort> convertHosts(List<String> hosts) {
     List<HostPort> ret = new ArrayList<HostPort>();
     for (String s : hosts) {
+      HostPort hp;
+      String[] spec = s.split(":");
+      if (spec.length == 1) {
+        hp = new HostPort(spec[0]);
+      } else if (spec.length == 2) {
+        hp = new HostPort(spec[0], Integer.parseInt(spec[1]));
+      } else {
+        throw new IllegalArgumentException("Invalid host specification: " + s);
+      }
+      ret.add(hp);
+    }
+    return ret;
+  }
+
+  public static List<HostPort> convertHosts(String hosts) {
+    List<HostPort> ret = new ArrayList<HostPort>();
+    String[] split = hosts.split(",");
+    for (String s : split) {
       HostPort hp;
       String[] spec = s.split(":");
       if (spec.length == 1) {
