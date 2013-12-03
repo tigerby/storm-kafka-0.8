@@ -10,12 +10,6 @@ It's ported from nathanmarz/storm-contrib/storm-kafka
 `KafkaSpout` is a regular spout implementation that reads from a Kafka cluster. The basic usage is like this:
 
 ```java
-SpoutConfig spoutConfig = new SpoutConfig(
-  ImmutableList.of("kafkahost1", "kafkahost2"),
-  8, // number of partitions per host
-  "clicks", // topic to read from
-  "/kafkastorm", // the root path in Zookeeper for the spout to store the consumer offsets
-  "discovery"); // an id for this consumer for storing the consumer offsets in Zookeeper
 
 
 // list of Kafka brokers
