@@ -107,20 +107,30 @@ public class StaticCoordinator implements PartitionCoordinator {
 
   public static HostPort findNewLeader(List<HostPort> replicaBrokers, HostPort oldLeader, String topic, int partition) {
     // TODO: property retry count.
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < 10; i++) {
+      LOG.info("trying to find new leader: {} times", i + 1);
+
+      boolean goToSleep = false;
       PartitionMetadata metadata = findLeader(replicaBrokers, topic, partition);
-      if(metadata != null && metadata.leader() != null) {
-        break;
-      }
-      if (!oldLeader.host.equalsIgnoreCase(metadata.leader().host()) || i != 0) {
+      if (metadata == null) {
+        goToSleep = true;
+      } else if (metadata.leader() == null) {
+        goToSleep = true;
+      } else if (!oldLeader.host.equals(metadata.leader().host()) && i == 0) {
         // first time through if the leader hasn't changed give ZooKeeper a second to recover
         // second time, assume the broker did recover before failover, or it was a non-Broker issue
-        return new HostPort(metadata.leader().host(), metadata.leader().port());
+        goToSleep = true;
+      } else {
+        HostPort newLeader = new HostPort(metadata.leader().host(), metadata.leader().port());
+        LOG.info("New leader found is {}", newLeader);
+        return newLeader;
       }
 
-      try {
-        Thread.sleep(1000);
-      } catch (InterruptedException ie) {
+      if (goToSleep) {
+        try {
+          Thread.sleep(1000);
+        } catch (InterruptedException ie) {
+        }
       }
     }
     throw new RuntimeException("Unable to find new leader after Broker failure. Exiting");

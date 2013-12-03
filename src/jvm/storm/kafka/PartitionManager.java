@@ -159,7 +159,7 @@ public class PartitionManager {
                  _emittedToOffset, numOfError);
 
         if (numOfError > 5) {
-          throw new RuntimeException("CANNOT find leader. partition: {}" + partitionId);
+          throw new RuntimeException("Cannot find leader. partition: {}. Exiting." + partitionId);
         }
       }
 
@@ -195,7 +195,15 @@ public class PartitionManager {
         .addFetch(_spoutConfig.topic, partitionId.partition, _emittedToOffset,
                   _spoutConfig.fetchSizeBytes)
         .build();
-    FetchResponse fetchResponse = _consumer.fetch(req);
+
+    FetchResponse fetchResponse;
+    try {
+      fetchResponse = _consumer.fetch(req);
+    } catch (Exception e) {
+      LOG.error("Error fetching data from the Broker: {}, Reason: {}", partitionId, e.getCause());
+      updateComponents();
+      return false;
+    }
 
     if (fetchResponse.hasError()) {
       short code = fetchResponse.errorCode(_spoutConfig.topic, partitionId.partition);
@@ -209,15 +217,8 @@ public class PartitionManager {
                           KafkaUtils.makeClientName(_spoutConfig.topic, partitionId.partition));
        return false;
       }
-      _consumer.close();
 
-      HostPort newLeader = StaticCoordinator
-          .findNewLeader(replicaBrokers, partitionId.host, _spoutConfig.topic, _consumer.port());
-
-      // update metadata
-      _connections.unregister(partitionId.host, partitionId.partition);
-      _connections.register(newLeader, partitionId.partition);
-      partitionId.host = newLeader;
+      updateComponents();
 
       return false;
     }
@@ -252,6 +253,18 @@ public class PartitionManager {
                partitionId);
     }
     return true;
+  }
+
+  private void updateComponents() {
+    _consumer.close();
+
+    HostPort newLeader = StaticCoordinator
+        .findNewLeader(replicaBrokers, partitionId.host, _spoutConfig.topic, partitionId.partition);
+
+    // update metadata
+    _connections.unregister(partitionId.host, partitionId.partition);
+    _consumer = _connections.register(newLeader, partitionId.partition);
+    partitionId.host = newLeader;
   }
 
   public void ack(Long offset) {
