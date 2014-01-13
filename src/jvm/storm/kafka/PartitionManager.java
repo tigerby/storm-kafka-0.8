@@ -149,7 +149,7 @@ public class PartitionManager {
       boolean stats = false;
       // TODO: property number.retry
       while (!stats && numOfError < 5) {
-        LOG.info("Fetching from Kafka: {} from offset {}. retry: {}", partitionId,
+        LOG.warn("Fetching from Kafka: {} from offset {}. retry: {}", partitionId,
                  _emittedToOffset, numOfError);
         stats = fill();
         numOfError++;
@@ -229,13 +229,13 @@ public class PartitionManager {
     _fetchAPIMessageCount.incrBy(numMessages);
 
     if (numMessages > 0) {
-      LOG.info("Fetched {} byte messages from Kafka: {}", numMessages, partitionId);
+      LOG.debug("Fetched {} byte messages from Kafka: {}", numMessages, partitionId);
     }
     for (MessageAndOffset messageAndOffset : messageAndOffsets) {
       long currentOffset = messageAndOffset.offset();
       // TODO: shouldn't check currentOffset and read offset?
 //      if (currentOffset < readOffset) {
-//        System.out.println("Found an old offset: " + currentOffset + " Expecting: " + readOffset);
+//        LOG.warn("Found an old offset: {} Expecting: {}", currentOffset, _emittedToOffset);
 //        continue;
 //      }
 //      readOffset = messageAndOffset.nextOffset();
@@ -264,7 +264,7 @@ public class PartitionManager {
   }
 
   public void commit() {
-    LOG.info("Committing offset {} for {}", _committedTo, partitionId);
+    LOG.debug("Committing offset {} for {}", _committedTo, partitionId);
     long committedTo;
     if (_pending.isEmpty()) {
       committedTo = _emittedToOffset;
