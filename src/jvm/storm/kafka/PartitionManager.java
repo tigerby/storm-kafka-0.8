@@ -155,7 +155,7 @@ public class PartitionManager {
       // TODO: property number.retry
       while (!fill()) {
         numOfError++;
-        LOG.info("Fetching from Kafka: {} from offset {}. retry: {}", partitionId,
+        LOG.warn("Fetching from Kafka: {} from offset {}. retry: {}", partitionId,
                  _emittedToOffset, numOfError);
 
         if (numOfError > 5) {
@@ -234,13 +234,13 @@ public class PartitionManager {
     _fetchAPIMessageCount.incrBy(numMessages);
 
     if (numMessages > 0) {
-      LOG.info("Fetched {} byte messages from Kafka: {}", numMessages, partitionId);
+      LOG.debug("Fetched {} byte messages from Kafka: {}", numMessages, partitionId);
     }
     for (MessageAndOffset messageAndOffset : messageAndOffsets) {
       long currentOffset = messageAndOffset.offset();
 
       if (currentOffset < _emittedToOffset) {
-        LOG.info("Found an old offset: {} Expecting: {}", currentOffset, _emittedToOffset);
+        LOG.warn("Found an old offset: {} Expecting: {}", currentOffset, _emittedToOffset);
         continue;
       }
 
@@ -249,7 +249,7 @@ public class PartitionManager {
       _emittedToOffset = messageAndOffset.nextOffset();
     }
     if (numMessages > 0) {
-      LOG.info("Added {} byte messages from Kafka: {} to internal buffers", numMessages,
+      LOG.debug("Added {} byte messages from Kafka: {} to internal buffers", numMessages,
                partitionId);
     }
     return true;
@@ -281,7 +281,7 @@ public class PartitionManager {
   }
 
   public void commit() {
-    LOG.info("Committing offset {} for {}", _committedTo, partitionId);
+    LOG.debug("Committing offset {} for {}", _committedTo, partitionId);
     long committedTo;
     if (_pending.isEmpty()) {
       committedTo = _emittedToOffset;
@@ -289,7 +289,7 @@ public class PartitionManager {
       committedTo = _pending.first();
     }
     if (committedTo != _committedTo) {
-      LOG.info("Writing committed offset to ZK: {}", committedTo);
+      LOG.debug("Writing committed offset to ZK: {}", committedTo);
 
       Map<Object, Object> data = ImmutableMap.builder()
           .put("topology", ImmutableMap.of("id", _topologyInstanceId,
@@ -301,10 +301,10 @@ public class PartitionManager {
           .put("topic", _spoutConfig.topic).build();
       _state.writeJSON(committedPath(), data);
 
-      LOG.info("Wrote committed offset to ZK: {}", committedTo);
+      LOG.debug("Wrote committed offset to ZK: {}", committedTo);
       _committedTo = committedTo;
     }
-    LOG.info("Committed offset {} for {}", committedTo, partitionId);
+    LOG.debug("Committed offset {} for {}", committedTo, partitionId);
   }
 
   private String committedPath() {
