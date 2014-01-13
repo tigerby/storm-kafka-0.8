@@ -13,6 +13,7 @@ import kafka.api.FetchRequest;
 import kafka.api.FetchRequestBuilder;
 import kafka.api.OffsetRequest;
 import kafka.api.PartitionOffsetRequestInfo;
+import kafka.common.ErrorMapping;
 import kafka.common.TopicAndPartition;
 import kafka.javaapi.FetchResponse;
 import kafka.javaapi.OffsetResponse;
@@ -25,6 +26,7 @@ import org.slf4j.LoggerFactory;
 
 import storm.kafka.KafkaSpout.EmitState;
 import storm.kafka.KafkaSpout.MessageAndRealOffset;
+import storm.kafka.trident.KafkaUtils;
 import storm.kafka.trident.MaxMetric;
 
 public class PartitionManager {
@@ -90,16 +92,19 @@ public class PartitionManager {
       _committedTo =
           getLastOffset(_consumer, spoutConfig.topic, id.partition, spoutConfig.startOffsetTime,
                         "cli-" + spoutConfig.topic + "-" + id.partition);
-      LOG.info("Init offset: [{}] Using startOffsetTime to choose last commit offset {}.", partitionId, _committedTo);
+      LOG.info("Init offset: [{}] Using startOffsetTime to choose last commit offset {}.",
+               partitionId, _committedTo);
     } else if (jsonTopologyId == null || jsonOffset == null) { // failed to parse JSON?
       _committedTo =
           getLastOffset(_consumer, spoutConfig.topic, id.partition,
                         kafka.api.OffsetRequest.LatestTime(),
                         "cli-" + spoutConfig.topic + "-" + id.partition);
-      LOG.info("Init offset: [{}] Setting last commit offset to HEAD({}).", partitionId, _committedTo);
+      LOG.info("Init offset: [{}] Setting last commit offset to HEAD({}).", partitionId,
+               _committedTo);
     } else {
       _committedTo = jsonOffset;
-      LOG.info("Init offset: [{}] Read last commit offset from zookeeper: {}", partitionId, _committedTo);
+      LOG.info("Init offset: [{}] Read last commit offset from zookeeper: {}", partitionId,
+               _committedTo);
     }
 
     LOG.info("Starting Kafka {} from offset {}", partitionId, _committedTo);
@@ -125,7 +130,7 @@ public class PartitionManager {
     OffsetResponse response = consumer.getOffsetsBefore(request);
 
     if (response.hasError()) {
-      System.out.println("Error fetching data Offset Data the Broker. Reason: " + response
+      LOG.info("Error fetching data Offset Data the Broker. Reason: {}", response
           .errorCode(topic, partition));
       return 0;
     }
@@ -146,17 +151,16 @@ public class PartitionManager {
   public EmitState next(SpoutOutputCollector collector) {
     if (_waitingToEmit.isEmpty()) {
       int numOfError = 0;
-      boolean stats = false;
-      // TODO: property number.retry
-      while (!stats && numOfError < 5) {
-        LOG.warn("Fetching from Kafka: {} from offset {}. retry: {}", partitionId,
-                 _emittedToOffset, numOfError);
-        stats = fill();
-        numOfError++;
-      }
 
-      if (numOfError > 5) {
-        throw new RuntimeException("CANNOT find leader. partition: {}" + partitionId);
+      // TODO: property number.retry
+      while (!fill()) {
+        numOfError++;
+        LOG.info("Fetching from Kafka: {} from offset {}. retry: {}", partitionId,
+                 _emittedToOffset, numOfError);
+
+        if (numOfError > 5) {
+          throw new RuntimeException("Cannot find leader. partition: {}. Exiting." + partitionId);
+        }
       }
 
     }
@@ -191,29 +195,30 @@ public class PartitionManager {
         .addFetch(_spoutConfig.topic, partitionId.partition, _emittedToOffset,
                   _spoutConfig.fetchSizeBytes)
         .build();
-    FetchResponse fetchResponse = _consumer.fetch(req);
+
+    FetchResponse fetchResponse;
+    try {
+      fetchResponse = _consumer.fetch(req);
+    } catch (Exception e) {
+      LOG.error("Error fetching data from the Broker: {}, Reason: {}", partitionId, e.getCause());
+      updateComponents();
+      return false;
+    }
 
     if (fetchResponse.hasError()) {
       short code = fetchResponse.errorCode(_spoutConfig.topic, partitionId.partition);
       LOG.error("Error fetching data from the Broker: {}, Reason: {}", partitionId, code);
 
-//      if (code == ErrorMapping.OffsetOutOfRangeCode()) {
-//        // TODO: what I have to do when offset if invalid.
-//        // We asked for an invalid offset. For simple case ask for the last element to reset
-//        readOffset =
-//            getLastOffset(_consumer, _spoutConfig.topic, partitionId.partition, kafka.api.OffsetRequest.LatestTime(),
-//                          KafkaUtils.makeClientName(_spoutConfig.topic, partitionId.partition));
-//       return false;
-//      }
-      _consumer.close();
+      if (code == ErrorMapping.OffsetOutOfRangeCode()) {
+        // TODO: what I have to do when offset if invalid.
+        // We asked for an invalid offset. For simple case ask for the last element to reset
+        _emittedToOffset =
+            getLastOffset(_consumer, _spoutConfig.topic, partitionId.partition, kafka.api.OffsetRequest.LatestTime(),
+                          KafkaUtils.makeClientName(_spoutConfig.topic, partitionId.partition));
+       return false;
+      }
 
-      HostPort newLeader = StaticCoordinator
-          .findNewLeader(replicaBrokers, partitionId.host, _spoutConfig.topic, _consumer.port());
-
-      // update metadata
-      _connections.unregister(partitionId.host, partitionId.partition);
-      _connections.register(newLeader, partitionId.partition);
-      partitionId.host = newLeader;
+      updateComponents();
 
       return false;
     }
@@ -229,25 +234,37 @@ public class PartitionManager {
     _fetchAPIMessageCount.incrBy(numMessages);
 
     if (numMessages > 0) {
-      LOG.debug("Fetched {} byte messages from Kafka: {}", numMessages, partitionId);
+      LOG.info("Fetched {} byte messages from Kafka: {}", numMessages, partitionId);
     }
     for (MessageAndOffset messageAndOffset : messageAndOffsets) {
       long currentOffset = messageAndOffset.offset();
-      // TODO: shouldn't check currentOffset and read offset?
-//      if (currentOffset < readOffset) {
-//        LOG.warn("Found an old offset: {} Expecting: {}", currentOffset, _emittedToOffset);
-//        continue;
-//      }
-//      readOffset = messageAndOffset.nextOffset();
+
+      if (currentOffset < _emittedToOffset) {
+        LOG.info("Found an old offset: {} Expecting: {}", currentOffset, _emittedToOffset);
+        continue;
+      }
 
       _pending.add(_emittedToOffset);
       _waitingToEmit.add(new MessageAndRealOffset(messageAndOffset.message(), _emittedToOffset));
-      _emittedToOffset = messageAndOffset.offset();
+      _emittedToOffset = messageAndOffset.nextOffset();
     }
     if (numMessages > 0) {
-      LOG.info("Added {} byte messages from Kafka: {} to internal buffers", numMessages, partitionId);
+      LOG.info("Added {} byte messages from Kafka: {} to internal buffers", numMessages,
+               partitionId);
     }
     return true;
+  }
+
+  private void updateComponents() {
+    _consumer.close();
+
+    HostPort newLeader = StaticCoordinator
+        .findNewLeader(replicaBrokers, partitionId.host, _spoutConfig.topic, partitionId.partition);
+
+    // update metadata
+    _connections.unregister(partitionId.host, partitionId.partition);
+    _consumer = _connections.register(newLeader, partitionId.partition);
+    partitionId.host = newLeader;
   }
 
   public void ack(Long offset) {
@@ -264,7 +281,7 @@ public class PartitionManager {
   }
 
   public void commit() {
-    LOG.debug("Committing offset {} for {}", _committedTo, partitionId);
+    LOG.info("Committing offset {} for {}", _committedTo, partitionId);
     long committedTo;
     if (_pending.isEmpty()) {
       committedTo = _emittedToOffset;

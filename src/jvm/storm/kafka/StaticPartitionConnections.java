@@ -1,7 +1,6 @@
 package storm.kafka;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import kafka.javaapi.consumer.SimpleConsumer;
 import storm.kafka.KafkaConfig.StaticHosts;
@@ -20,7 +19,7 @@ public class StaticPartitionConnections {
   }
 
   public SimpleConsumer getConsumer(int partition) {
-    int hostIndex = partition / hosts.partitionsPerHost;
+    int hostIndex = partition / _config.partitions;
     if(!_kafka.containsKey(hostIndex)) {
       HostPort hp = hosts.hosts.get(hostIndex);
       // todo should make a proper client name.
@@ -31,7 +30,7 @@ public class StaticPartitionConnections {
   }
 
   public int getHostPartition(int globalPartition) {
-    return globalPartition % hosts.partitionsPerHost;
+    return globalPartition % _config.partitions;
   }
 
   public int getNumberOfHosts() {

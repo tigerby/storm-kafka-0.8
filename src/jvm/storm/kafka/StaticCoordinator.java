@@ -22,14 +22,21 @@ public class StaticCoordinator implements PartitionCoordinator {
   Map<GlobalPartitionId, PartitionManager> managers =
       new HashMap<GlobalPartitionId, PartitionManager>();
 
-  // TODO: integrate parallelism of Storm with partition of Kafka.
   public StaticCoordinator(DynamicPartitionConnections connections, Map stormConf,
                            SpoutConfig config, ZkState state, int taskIndex, int totalTasks,
                            String topologyInstanceId) {
     StaticHosts hosts = (StaticHosts) config.hosts;
 
-    for (int i = 0; i < hosts.partitionsPerHost; i++) {
+    List<PartitionMetadata> allPartitionMetadata = new ArrayList<PartitionMetadata>();
+    for (int i = 0; i < config.partitions; i++) {
       PartitionMetadata metadata = findLeader(hosts.hosts, config.topic, i);
+      if(metadata != null) {
+        allPartitionMetadata.add(metadata);
+      }
+    }
+
+    for(int i=taskIndex; i<allPartitionMetadata.size(); i+=totalTasks) {
+      PartitionMetadata metadata = allPartitionMetadata.get(i);
       HostPort hostPort = hosts.valueOf(metadata.leader().host(), metadata.leader().port());
 
       List<HostPort> replicas = new ArrayList<HostPort>();
@@ -48,7 +55,7 @@ public class StaticCoordinator implements PartitionCoordinator {
 
   @Override
   public List<PartitionManager> getMyManagedPartitions() {
-    return new ArrayList(managers.values());
+    return new ArrayList<PartitionManager>(managers.values());
   }
 
   public PartitionManager getManager(GlobalPartitionId id) {
@@ -100,20 +107,30 @@ public class StaticCoordinator implements PartitionCoordinator {
 
   public static HostPort findNewLeader(List<HostPort> replicaBrokers, HostPort oldLeader, String topic, int partition) {
     // TODO: property retry count.
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < 10; i++) {
+      LOG.info("trying to find new leader: {} times", i + 1);
+
+      boolean goToSleep = false;
       PartitionMetadata metadata = findLeader(replicaBrokers, topic, partition);
-      if(metadata != null && metadata.leader() != null) {
-        break;
-      }
-      if (!oldLeader.host.equalsIgnoreCase(metadata.leader().host()) || i != 0) {
+      if (metadata == null) {
+        goToSleep = true;
+      } else if (metadata.leader() == null) {
+        goToSleep = true;
+      } else if (!oldLeader.host.equals(metadata.leader().host()) && i == 0) {
         // first time through if the leader hasn't changed give ZooKeeper a second to recover
         // second time, assume the broker did recover before failover, or it was a non-Broker issue
-        return new HostPort(metadata.leader().host(), metadata.leader().port());
+        goToSleep = true;
+      } else {
+        HostPort newLeader = new HostPort(metadata.leader().host(), metadata.leader().port());
+        LOG.info("New leader found is {}", newLeader);
+        return newLeader;
       }
 
-      try {
-        Thread.sleep(1000);
-      } catch (InterruptedException ie) {
+      if (goToSleep) {
+        try {
+          Thread.sleep(1000);
+        } catch (InterruptedException ie) {
+        }
       }
     }
     throw new RuntimeException("Unable to find new leader after Broker failure. Exiting");
