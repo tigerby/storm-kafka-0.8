@@ -130,7 +130,7 @@ public class PartitionManager {
     OffsetResponse response = consumer.getOffsetsBefore(request);
 
     if (response.hasError()) {
-      LOG.info("Error fetching data Offset Data the Broker. Reason: {}", response
+      LOG.error("Error fetching data Offset Data the Broker. Reason: {}", response
           .errorCode(topic, partition));
       return 0;
     }
@@ -200,14 +200,14 @@ public class PartitionManager {
     try {
       fetchResponse = _consumer.fetch(req);
     } catch (Exception e) {
-      LOG.error("Error fetching data from the Broker: {}, Reason: {}", partitionId, e.getCause());
+      LOG.warn("Error fetching data from the Broker: {}, Reason: {}", partitionId, e.getCause());
       updateComponents();
       return false;
     }
 
     if (fetchResponse.hasError()) {
       short code = fetchResponse.errorCode(_spoutConfig.topic, partitionId.partition);
-      LOG.error("Error fetching data from the Broker: {}, Reason: {}", partitionId, code);
+      LOG.warn("Error fetching data from the Broker: {}, Reason: {}", partitionId, code);
 
       if (code == ErrorMapping.OffsetOutOfRangeCode()) {
         // TODO: what I have to do when offset if invalid.
@@ -249,7 +249,7 @@ public class PartitionManager {
       _emittedToOffset = messageAndOffset.nextOffset();
     }
     if (numMessages > 0) {
-      LOG.debug("Added {} byte messages from Kafka: {} to internal buffers", numMessages,
+      LOG.info("Added {} byte messages from Kafka: {} to internal buffers", numMessages,
                partitionId);
     }
     return true;
@@ -304,7 +304,7 @@ public class PartitionManager {
       LOG.debug("Wrote committed offset to ZK: {}", committedTo);
       _committedTo = committedTo;
     }
-    LOG.debug("Committed offset {} for {}", committedTo, partitionId);
+    LOG.info("Committed offset {} for {}", committedTo, partitionId);
   }
 
   private String committedPath() {
