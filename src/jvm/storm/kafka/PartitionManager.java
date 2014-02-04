@@ -159,7 +159,7 @@ public class PartitionManager {
                  _emittedToOffset, numOfError);
 
         if (numOfError > 5) {
-          throw new RuntimeException("Cannot find leader. partition: {}. Exiting." + partitionId);
+          LOG.error("Cannot find leader. partition: {}.", partitionId);
         }
       }
 
