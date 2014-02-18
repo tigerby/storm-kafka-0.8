@@ -1,4 +1,4 @@
-package storm.kafka;
+package storm.kafka.test;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -12,6 +12,10 @@ import backtype.storm.topology.TopologyBuilder;
 import backtype.storm.topology.base.BaseBasicBolt;
 import backtype.storm.tuple.Tuple;
 import backtype.storm.utils.Utils;
+import storm.kafka.KafkaConfig;
+import storm.kafka.KafkaSpout;
+import storm.kafka.SpoutConfig;
+import storm.kafka.StringScheme;
 
 public class TestTopology {
 

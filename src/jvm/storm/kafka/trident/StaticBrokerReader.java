@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
 import storm.kafka.HostPort;
 import storm.kafka.KafkaConfig.StaticHosts;
 
@@ -11,17 +12,17 @@ import storm.kafka.KafkaConfig.StaticHosts;
 public class StaticBrokerReader implements IBrokerReader {
 
     Map<String, List> brokers = new HashMap();
-    
-    public StaticBrokerReader(StaticHosts hosts) {
-        for(HostPort hp: hosts.hosts) {
+
+    public StaticBrokerReader(TridentKafkaConfig config) {
+        StaticHosts hosts = (StaticHosts) config.hosts;
+        for (HostPort hp : hosts.hosts) {
             List info = new ArrayList();
             info.add((long) hp.port);
-          // TODO: should be removed
-//            info.add((long) hosts.partitionsPerHost);
+            info.add((long) config.partitions);
             brokers.put(hp.host, info);
         }
     }
-    
+
     @Override
     public Map<String, List> getCurrentBrokers() {
         return brokers;
