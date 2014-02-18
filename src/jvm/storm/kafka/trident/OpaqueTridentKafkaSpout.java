@@ -15,12 +15,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import storm.kafka.DynamicPartitionConnections;
 import storm.kafka.GlobalPartitionId;
+import storm.kafka.HostPort;
 import storm.trident.operation.TridentCollector;
 import storm.trident.spout.IOpaquePartitionedTridentSpout;
 import storm.trident.topology.TransactionAttempt;
 
 
-public class OpaqueTridentKafkaSpout implements IOpaquePartitionedTridentSpout<Map<String, List>, GlobalPartitionId, Map> {
+public class OpaqueTridentKafkaSpout implements IOpaquePartitionedTridentSpout<List<GlobalPartitionId>, GlobalPartitionId, Map> {
     public static final Logger LOG = LoggerFactory.getLogger(OpaqueTridentKafkaSpout.class);
     
     TridentKafkaConfig _config;
@@ -31,7 +32,7 @@ public class OpaqueTridentKafkaSpout implements IOpaquePartitionedTridentSpout<M
     }
     
     @Override
-    public IOpaquePartitionedTridentSpout.Emitter<Map<String, List>, GlobalPartitionId, Map> getEmitter(Map conf, TopologyContext context) {
+    public IOpaquePartitionedTridentSpout.Emitter<List<GlobalPartitionId>, GlobalPartitionId, Map> getEmitter(Map conf, TopologyContext context) {
         return new Emitter(conf, context);
     }
     
@@ -50,7 +51,7 @@ public class OpaqueTridentKafkaSpout implements IOpaquePartitionedTridentSpout<M
         return null;
     }
     
-    class Coordinator implements IOpaquePartitionedTridentSpout.Coordinator<Map> {
+    class Coordinator implements IOpaquePartitionedTridentSpout.Coordinator<List<GlobalPartitionId>> {
         IBrokerReader reader;
         
         public Coordinator(Map conf) {
@@ -68,12 +69,12 @@ public class OpaqueTridentKafkaSpout implements IOpaquePartitionedTridentSpout<M
         }
 
         @Override
-        public Map getPartitionsForBatch() {
+        public List<GlobalPartitionId> getPartitionsForBatch() {
             return reader.getCurrentBrokers();
         }
     }
     
-    class Emitter implements IOpaquePartitionedTridentSpout.Emitter<Map<String, List>, GlobalPartitionId, Map> {
+    class Emitter implements IOpaquePartitionedTridentSpout.Emitter<List<GlobalPartitionId>, GlobalPartitionId, Map> {
         DynamicPartitionConnections _connections;
         String _topologyName;
         KafkaUtils.KafkaOffsetMetric _kafkaOffsetMetric;
@@ -120,8 +121,8 @@ public class OpaqueTridentKafkaSpout implements IOpaquePartitionedTridentSpout<M
         }
 
         @Override
-        public List<GlobalPartitionId> getOrderedPartitions(Map<String, List> partitions) {
-            return KafkaUtils.getOrderedPartitions(partitions);
+        public List<GlobalPartitionId> getOrderedPartitions(List<GlobalPartitionId> partitions) {
+            return partitions;
         }
 
         @Override

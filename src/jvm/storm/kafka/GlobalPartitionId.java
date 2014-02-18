@@ -2,8 +2,10 @@ package storm.kafka;
 
 import storm.trident.spout.ISpoutPartition;
 
+import java.io.Serializable;
 
-public class GlobalPartitionId implements ISpoutPartition {
+
+public class GlobalPartitionId implements ISpoutPartition, Serializable {
     public HostPort host;
     public int partition;
 

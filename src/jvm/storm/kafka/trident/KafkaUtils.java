@@ -14,8 +14,7 @@ import kafka.api.FetchRequestBuilder;
 import kafka.api.OffsetRequest;
 import kafka.api.PartitionOffsetRequestInfo;
 import kafka.common.TopicAndPartition;
-import kafka.javaapi.FetchResponse;
-import kafka.javaapi.OffsetResponse;
+import kafka.javaapi.*;
 import kafka.javaapi.consumer.SimpleConsumer;
 import kafka.javaapi.message.ByteBufferMessageSet;
 import kafka.message.Message;
@@ -41,17 +40,15 @@ public class KafkaUtils {
         }
     }
 
-    public static List<GlobalPartitionId> getOrderedPartitions(Map<String, List> partitions) {
-        List<GlobalPartitionId> ret = new ArrayList();
-        for (String host : new TreeMap<String, List>(partitions).keySet()) {
-            List info = partitions.get(host);
-            long port = (Long) info.get(0);
-            long numPartitions = (Long) info.get(1);
-            HostPort hp = new HostPort(host, (int) port);
-            for (int i = 0; i < numPartitions; i++) {
-                ret.add(new GlobalPartitionId(hp, i));
-            }
-        }
+    public static List<GlobalPartitionId> getOrderedPartitions(List<GlobalPartitionId> partitions) {
+        List<GlobalPartitionId> ret = new ArrayList<GlobalPartitionId>();
+//        for (HostPort hp : new TreeMap<HostPort, Number>(partitions).keySet()) {
+//            long numPartitions = (Long) partitions.get(hp);
+//
+//            for (int i = 0; i < numPartitions; i++) {
+//                ret.add(new GlobalPartitionId(hp, i));
+//            }
+//        }
         return ret;
     }
 
@@ -202,7 +199,39 @@ public class KafkaUtils {
         }
     }
 
-    ;
+    public static PartitionMetadata findLeader(List<HostPort> seedBrokers, String topic, int partition) {
+        PartitionMetadata returnMetaData = null;
+        for (HostPort seed : seedBrokers) {
+            SimpleConsumer consumer = null;
+            try {
+                // TODO: property meta data.
+                consumer = new SimpleConsumer(seed.host, seed.port, 100000, 64 * 1024, "leaderLookup");
+                List<String> topics = new ArrayList<String>();
+                topics.add(topic);
+                TopicMetadataRequest req = new TopicMetadataRequest(topics);
+                kafka.javaapi.TopicMetadataResponse resp = consumer.send(req);
+
+                List<TopicMetadata> metaData = resp.topicsMetadata();
+                for (TopicMetadata item : metaData) {
+                    for (PartitionMetadata part : item.partitionsMetadata()) {
+                        if (part.partitionId() == partition) {
+                            returnMetaData = part;
+                            break;
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                LOG.error("Error communicating with Broker [{}] to find Leader for [{}, {}] Reason: ", seed,
+                        topic, partition, e);
+            } finally {
+                if (consumer != null) {
+                    consumer.close();
+                }
+            }
+        }
+
+        return returnMetaData;
+    }
 
     public static long getLastOffset(SimpleConsumer consumer, String topic, int partition,
                                      long whichTime, String clientName) {

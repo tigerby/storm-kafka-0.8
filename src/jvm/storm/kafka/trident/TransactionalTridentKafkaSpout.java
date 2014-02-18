@@ -21,13 +21,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import storm.kafka.DynamicPartitionConnections;
 import storm.kafka.GlobalPartitionId;
+import storm.kafka.HostPort;
 import storm.trident.operation.TridentCollector;
 import storm.trident.spout.IPartitionedTridentSpout;
 import storm.trident.topology.TransactionAttempt;
 
 
-public class TransactionalTridentKafkaSpout implements IPartitionedTridentSpout<Map<String, List>, GlobalPartitionId, Map> {
-    
+public class TransactionalTridentKafkaSpout implements IPartitionedTridentSpout<List<GlobalPartitionId>, GlobalPartitionId, Map> {
+
     TridentKafkaConfig _config;
     String _topologyInstanceId = UUID.randomUUID().toString();
     public static final Logger LOG = LoggerFactory.getLogger(TransactionalTridentKafkaSpout.class);
@@ -35,14 +36,16 @@ public class TransactionalTridentKafkaSpout implements IPartitionedTridentSpout<
     public TransactionalTridentKafkaSpout(TridentKafkaConfig config) {
         _config = config;
     }
-    
-    class Coordinator implements IPartitionedTridentSpout.Coordinator<Map> {
+
+    class Coordinator implements IPartitionedTridentSpout.Coordinator<List<GlobalPartitionId>> {
+        private final TopologyContext context;
         IBrokerReader reader;
-        
-        public Coordinator(Map conf) {
+
+        public Coordinator(Map conf, TopologyContext context) {
             reader = KafkaUtils.makeBrokerReader(conf, _config);
+            this.context = context;
         }
-        
+
         @Override
         public void close() {
             _config.coordinator.close();
@@ -54,12 +57,12 @@ public class TransactionalTridentKafkaSpout implements IPartitionedTridentSpout<
         }
 
         @Override
-        public Map getPartitionsForBatch() {
+        public List<GlobalPartitionId> getPartitionsForBatch() {
            return reader.getCurrentBrokers();
         }
     }
-    
-    class Emitter implements IPartitionedTridentSpout.Emitter<Map<String, List>, GlobalPartitionId, Map> {
+
+    class Emitter implements IPartitionedTridentSpout.Emitter<List<GlobalPartitionId>, GlobalPartitionId, Map> {
         DynamicPartitionConnections _connections;
         String _topologyName;
         TopologyContext _context;
@@ -76,7 +79,7 @@ public class TransactionalTridentKafkaSpout implements IPartitionedTridentSpout<
             _kafkaMeanFetchLatencyMetric = context.registerMetric("kafkaFetchAvg", new MeanReducer(), 60);
             _kafkaMaxFetchLatencyMetric = context.registerMetric("kafkaFetchMax", new MaxMetric(), 60);
         }
-        
+
         @Override
         public Map emitPartitionBatchNew(TransactionAttempt attempt, TridentCollector collector, GlobalPartitionId partition, Map lastMeta) {
             SimpleConsumer consumer = _connections.register(partition);
@@ -115,15 +118,15 @@ public class TransactionalTridentKafkaSpout implements IPartitionedTridentSpout<
                 }
             }
         }
-        
+
         @Override
         public void close() {
             _connections.clear();
         }
 
         @Override
-        public List<GlobalPartitionId> getOrderedPartitions(Map<String, List> partitions) {
-            return KafkaUtils.getOrderedPartitions(partitions);
+        public List<GlobalPartitionId> getOrderedPartitions(List<GlobalPartitionId> partitions) {
+            return partitions;
         }
 
         @Override
@@ -132,11 +135,11 @@ public class TransactionalTridentKafkaSpout implements IPartitionedTridentSpout<
             _kafkaOffsetMetric.refreshPartitions(new HashSet<GlobalPartitionId>(list));
         }
     }
-    
+
 
     @Override
     public IPartitionedTridentSpout.Coordinator getCoordinator(Map conf, TopologyContext context) {
-        return new Coordinator(conf);
+        return new Coordinator(conf, context);
     }
 
     @Override
@@ -148,7 +151,7 @@ public class TransactionalTridentKafkaSpout implements IPartitionedTridentSpout<
     public Fields getOutputFields() {
         return _config.scheme.getOutputFields();
     }
-        
+
     @Override
     public Map<String, Object> getComponentConfiguration() {
         return null;
