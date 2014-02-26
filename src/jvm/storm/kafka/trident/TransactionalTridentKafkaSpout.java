@@ -2,7 +2,6 @@ package storm.kafka.trident;
 
 import backtype.storm.Config;
 import backtype.storm.metric.api.CombinedMetric;
-import backtype.storm.metric.api.IMetric;
 import backtype.storm.metric.api.MeanReducer;
 import backtype.storm.metric.api.ReducedMetric;
 import backtype.storm.task.TopologyContext;
@@ -12,16 +11,14 @@ import java.util.*;
 
 import kafka.api.FetchRequest;
 import kafka.api.FetchRequestBuilder;
-import kafka.api.OffsetRequest;
 import kafka.javaapi.FetchResponse;
 import kafka.javaapi.consumer.SimpleConsumer;
-import kafka.javaapi.message.ByteBufferMessageSet;
 import kafka.message.MessageAndOffset;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import storm.kafka.DynamicPartitionConnections;
 import storm.kafka.GlobalPartitionId;
-import storm.kafka.HostPort;
+import storm.kafka.KafkaUtils;
 import storm.trident.operation.TridentCollector;
 import storm.trident.spout.IPartitionedTridentSpout;
 import storm.trident.topology.TransactionAttempt;
@@ -42,7 +39,7 @@ public class TransactionalTridentKafkaSpout implements IPartitionedTridentSpout<
         IBrokerReader reader;
 
         public Coordinator(Map conf, TopologyContext context) {
-            reader = KafkaUtils.makeBrokerReader(conf, _config);
+            reader = TridentUtils.makeBrokerReader(conf, _config);
             this.context = context;
         }
 
@@ -58,7 +55,7 @@ public class TransactionalTridentKafkaSpout implements IPartitionedTridentSpout<
 
         @Override
         public List<GlobalPartitionId> getPartitionsForBatch() {
-           return reader.getCurrentBrokers();
+            return reader.getCurrentBrokers();
         }
     }
 
@@ -82,14 +79,17 @@ public class TransactionalTridentKafkaSpout implements IPartitionedTridentSpout<
 
         @Override
         public Map emitPartitionBatchNew(TransactionAttempt attempt, TridentCollector collector, GlobalPartitionId partition, Map lastMeta) {
+            LOG.info("Spout#emitPartitionBatchNew");
+//            LOG.info("[{}] {}, {}, {}", _context.getThisTaskId(), attempt, partition, lastMeta);
             SimpleConsumer consumer = _connections.register(partition);
-            Map ret = KafkaUtils.emitPartitionBatchNew(_config, consumer, partition, collector, lastMeta, _topologyInstanceId, _topologyName, _kafkaMeanFetchLatencyMetric, _kafkaMaxFetchLatencyMetric);
+            Map ret = TridentUtils.emitPartitionBatchNew(_config, consumer, partition, collector, lastMeta, _topologyInstanceId, _topologyName, _kafkaMeanFetchLatencyMetric, _kafkaMaxFetchLatencyMetric);
             _kafkaOffsetMetric.setLatestEmittedOffset(partition, (Long)ret.get("offset"));
             return ret;
         }
 
         @Override
         public void emitPartitionBatch(TransactionAttempt attempt, TridentCollector collector, GlobalPartitionId partition, Map meta) {
+            LOG.info("Spout#emitPartitionBatch");
             String instanceId = (String) meta.get("instanceId");
             if(!_config.forceFromStart || instanceId.equals(_topologyInstanceId)) {
                 SimpleConsumer consumer = _connections.register(partition);
@@ -98,9 +98,9 @@ public class TransactionalTridentKafkaSpout implements IPartitionedTridentSpout<
                 long start = System.nanoTime();
 
                 FetchRequest fetchRequest = new FetchRequestBuilder()
-                    .clientId(KafkaUtils.makeClientName(_config.topic, partition.partition))
-                    .addFetch(_config.topic, partition.partition, offset, _config.fetchSizeBytes)
-                    .build();
+                        .clientId(KafkaUtils.makeClientName(_config.topic, partition.partition))
+                        .addFetch(_config.topic, partition.partition, offset, _config.fetchSizeBytes)
+                        .build();
                 FetchResponse fetchResponse = consumer.fetch(fetchRequest);
 
                 long end = System.nanoTime();
@@ -108,12 +108,12 @@ public class TransactionalTridentKafkaSpout implements IPartitionedTridentSpout<
                 _kafkaMeanFetchLatencyMetric.update(millis);
                 _kafkaMaxFetchLatencyMetric.update(millis);
 
-                for(MessageAndOffset msg: fetchResponse.messageSet(_config.topic, partition.partition)) {
-                    if(offset == nextOffset) break;
-                    if(offset > nextOffset) {
+                for (MessageAndOffset msg : fetchResponse.messageSet(_config.topic, partition.partition)) {
+                    if (offset == nextOffset) break;
+                    if (offset > nextOffset) {
                         throw new RuntimeException("Error when re-emitting batch. overshot the end offset");
                     }
-                    KafkaUtils.emit(_config, collector, msg.message());
+                    TridentUtils.emit(_config, collector, msg.message());
                     offset = msg.offset();
                 }
             }

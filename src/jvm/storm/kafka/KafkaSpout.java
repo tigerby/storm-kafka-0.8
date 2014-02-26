@@ -1,33 +1,17 @@
 package storm.kafka;
 
-import java.util.*;
-
-import backtype.storm.LocalCluster;
-import backtype.storm.StormSubmitter;
-import backtype.storm.generated.ClusterSummary;
-import backtype.storm.generated.Nimbus;
-import backtype.storm.generated.NotAliveException;
-import backtype.storm.generated.StormTopology;
-import backtype.storm.generated.TopologyInfo;
-import backtype.storm.metric.api.*;
-import backtype.storm.spout.SchemeAsMultiScheme;
-import backtype.storm.task.IMetricsContext;
-
-import org.apache.thrift7.TException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import backtype.storm.Config;
+import backtype.storm.metric.api.IMetric;
 import backtype.storm.spout.SpoutOutputCollector;
 import backtype.storm.task.TopologyContext;
 import backtype.storm.topology.OutputFieldsDeclarer;
-import backtype.storm.topology.TopologyBuilder;
 import backtype.storm.topology.base.BaseRichSpout;
-import backtype.storm.utils.NimbusClient;
-import backtype.storm.utils.Utils;
 import kafka.message.Message;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import storm.kafka.PartitionManager.KafkaMessageId;
-import storm.kafka.trident.KafkaUtils;
+
+import java.util.*;
 
 // TODO: need to add blacklisting
 // TODO: need to make a best effort to not re-emit messages if don't have to

@@ -15,7 +15,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import storm.kafka.DynamicPartitionConnections;
 import storm.kafka.GlobalPartitionId;
-import storm.kafka.HostPort;
+import storm.kafka.KafkaUtils;
 import storm.trident.operation.TridentCollector;
 import storm.trident.spout.IOpaquePartitionedTridentSpout;
 import storm.trident.topology.TransactionAttempt;
@@ -55,7 +55,7 @@ public class OpaqueTridentKafkaSpout implements IOpaquePartitionedTridentSpout<L
         IBrokerReader reader;
         
         public Coordinator(Map conf) {
-            reader = KafkaUtils.makeBrokerReader(conf, _config);
+            reader = TridentUtils.makeBrokerReader(conf, _config);
         }
         
         @Override
@@ -94,7 +94,7 @@ public class OpaqueTridentKafkaSpout implements IOpaquePartitionedTridentSpout<L
         public Map emitPartitionBatch(TransactionAttempt attempt, TridentCollector collector, GlobalPartitionId partition, Map lastMeta) {
             try {
                 SimpleConsumer consumer = _connections.register(partition);
-                Map ret = KafkaUtils.emitPartitionBatchNew(_config, consumer, partition, collector, lastMeta, _topologyInstanceId, _topologyName, _kafkaMeanFetchLatencyMetric, _kafkaMaxFetchLatencyMetric);
+                Map ret = TridentUtils.emitPartitionBatchNew(_config, consumer, partition, collector, lastMeta, _topologyInstanceId, _topologyName, _kafkaMeanFetchLatencyMetric, _kafkaMaxFetchLatencyMetric);
                 _kafkaOffsetMetric.setLatestEmittedOffset(partition, (Long)ret.get("offset"));
                 return ret;
             } catch(FailedFetchException e) {

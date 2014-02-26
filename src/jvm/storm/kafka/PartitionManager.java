@@ -26,7 +26,6 @@ import org.slf4j.LoggerFactory;
 
 import storm.kafka.KafkaSpout.EmitState;
 import storm.kafka.KafkaSpout.MessageAndRealOffset;
-import storm.kafka.trident.KafkaUtils;
 import storm.kafka.trident.MaxMetric;
 
 public class PartitionManager {
