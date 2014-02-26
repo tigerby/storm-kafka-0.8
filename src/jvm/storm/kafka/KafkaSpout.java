@@ -10,6 +10,7 @@ import kafka.message.Message;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import storm.kafka.PartitionManager.KafkaMessageId;
+import storm.kafka.metric.KafkaOffsetMetric;
 
 import java.util.*;
 
@@ -84,9 +85,9 @@ public class KafkaSpout extends BaseRichSpout {
     }
 
     context.registerMetric("kafkaOffset", new IMetric() {
-      KafkaUtils.KafkaOffsetMetric
+      KafkaOffsetMetric
           _kafkaOffsetMetric =
-          new KafkaUtils.KafkaOffsetMetric(_spoutConfig.topic, _connections);
+          new KafkaOffsetMetric(_spoutConfig.topic, _connections);
 
       @Override
       public Object getValueAndReset() {

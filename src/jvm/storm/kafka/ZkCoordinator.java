@@ -12,6 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import storm.kafka.KafkaConfig.ZkHosts;
 
+@Deprecated
 public class ZkCoordinator implements PartitionCoordinator {
     public static Logger LOG = LoggerFactory.getLogger(ZkCoordinator.class);
     

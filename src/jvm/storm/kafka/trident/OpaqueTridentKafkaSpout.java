@@ -15,7 +15,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import storm.kafka.DynamicPartitionConnections;
 import storm.kafka.GlobalPartitionId;
-import storm.kafka.KafkaUtils;
+import storm.kafka.metric.KafkaOffsetMetric;
+import storm.kafka.metric.MaxMetric;
 import storm.trident.operation.TridentCollector;
 import storm.trident.spout.IOpaquePartitionedTridentSpout;
 import storm.trident.topology.TransactionAttempt;
@@ -77,14 +78,14 @@ public class OpaqueTridentKafkaSpout implements IOpaquePartitionedTridentSpout<L
     class Emitter implements IOpaquePartitionedTridentSpout.Emitter<List<GlobalPartitionId>, GlobalPartitionId, Map> {
         DynamicPartitionConnections _connections;
         String _topologyName;
-        KafkaUtils.KafkaOffsetMetric _kafkaOffsetMetric;
+        KafkaOffsetMetric _kafkaOffsetMetric;
         ReducedMetric _kafkaMeanFetchLatencyMetric;
         CombinedMetric _kafkaMaxFetchLatencyMetric;
 
         public Emitter(Map conf, TopologyContext context) {
             _connections = new DynamicPartitionConnections(_config);
             _topologyName = (String) conf.get(Config.TOPOLOGY_NAME);
-            _kafkaOffsetMetric = new KafkaUtils.KafkaOffsetMetric(_config.topic, _connections);
+            _kafkaOffsetMetric = new KafkaOffsetMetric(_config.topic, _connections);
             context.registerMetric("kafkaOffset", _kafkaOffsetMetric, 60);
             _kafkaMeanFetchLatencyMetric = context.registerMetric("kafkaFetchAvg", new MeanReducer(), 60);
             _kafkaMaxFetchLatencyMetric = context.registerMetric("kafkaFetchMax", new MaxMetric(), 60);

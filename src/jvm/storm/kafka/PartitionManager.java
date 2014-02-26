@@ -26,7 +26,7 @@ import org.slf4j.LoggerFactory;
 
 import storm.kafka.KafkaSpout.EmitState;
 import storm.kafka.KafkaSpout.MessageAndRealOffset;
-import storm.kafka.trident.MaxMetric;
+import storm.kafka.metric.MaxMetric;
 
 public class PartitionManager {
 
@@ -257,8 +257,7 @@ public class PartitionManager {
   private void updateComponents() {
     _consumer.close();
 
-    HostPort newLeader = StaticCoordinator
-        .findNewLeader(replicaBrokers, partitionId.host, _spoutConfig.topic, partitionId.partition);
+    HostPort newLeader = KafkaUtils.findNewLeader(replicaBrokers, partitionId.host, _spoutConfig.topic, partitionId.partition);
 
     // update metadata
     _connections.unregister(partitionId.host, partitionId.partition);

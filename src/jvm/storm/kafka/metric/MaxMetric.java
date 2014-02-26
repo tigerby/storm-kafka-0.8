@@ -1,4 +1,4 @@
-package storm.kafka.trident;
+package storm.kafka.metric;
 
 
 import backtype.storm.metric.api.ICombiner;

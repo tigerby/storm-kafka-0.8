@@ -14,9 +14,7 @@ public class KafkaConfig implements Serializable {
   public static final long EARLIEST_TIME = kafka.api.OffsetRequest.EarliestTime();     // -2
   public static final long LATEST_TIME = kafka.api.OffsetRequest.LatestTime();        // -1
 
-  public static interface BrokerHosts extends Serializable {
-    HostPort valueOf(String host, int port);
-  }
+  public static interface BrokerHosts extends Serializable {}
 
   public static class StaticHosts implements BrokerHosts {
 
@@ -39,19 +37,6 @@ public class KafkaConfig implements Serializable {
       return new StaticHosts(convertHosts(hostStrings));
     }
 
-    public HostPort valueOf(String host, int port) {
-      for(HostPort hp: hosts) {
-        if(hp.host.equals(host) && hp.port == port) {
-          return hp;
-        }
-      }
-
-      LOG.info("add new broker, {}:{}", host, port);
-      HostPort newOne = new HostPort(host, port);
-      hosts.add(newOne);
-      return newOne;
-    }
-
     public StaticHosts(List<HostPort> hosts) {
       this.hosts = hosts;
     }
@@ -69,15 +54,10 @@ public class KafkaConfig implements Serializable {
       this.brokerZkPath = brokerZkPath;
     }
 
-    @Override
-    public HostPort valueOf(String host, int port) {
-      return null;  //To change body of implemented methods use File | Settings | File Templates.
-    }
   }
 
 
   public BrokerHosts hosts;
-  // TODO: property
   public int fetchSizeBytes = 1024 * 1024;
   public int socketTimeoutMs = 10000;
   public int bufferSizeBytes = 1024 * 1024;

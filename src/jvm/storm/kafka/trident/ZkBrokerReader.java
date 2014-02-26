@@ -8,6 +8,7 @@ import storm.kafka.HostPort;
 import storm.kafka.KafkaConfig.ZkHosts;
 
 
+@Deprecated
 public class ZkBrokerReader implements IBrokerReader {
 
     List<GlobalPartitionId> cachedBrokers;
