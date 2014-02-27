@@ -85,6 +85,18 @@ public class TridentUtils {
             }
 
             // TODO: update consumer to new leader and replicas, then return new last meta.
+//            PartitionMetadata metadata = KafkaUtils.recoverPartitionMetadata(replicaBrokers, partitionId.host, _spoutConfig.topic, partitionId.partition);
+//            HostPort newLeader = new HostPort(metadata.leader().host(), metadata.leader().port());
+//            LOG.info("New leader found is {}", newLeader);
+//
+//            // update metadata
+//            _connections.unregister(partitionId.host, partitionId.partition);
+//            if(_consumer != null)   _consumer.close();
+//
+//            partitionId.host = newLeader;
+//            _consumer = _connections.register(newLeader, partitionId.partition);
+//            replicaBrokers = KafkaUtils.replicas(metadata);
+
         }
 
         ByteBufferMessageSet msgSet = fetchResponse.messageSet(config.topic, partition.partition);

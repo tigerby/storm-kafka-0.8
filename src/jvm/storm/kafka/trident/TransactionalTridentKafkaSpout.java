@@ -11,12 +11,15 @@ import java.util.*;
 
 import kafka.api.FetchRequest;
 import kafka.api.FetchRequestBuilder;
+import kafka.common.ErrorMapping;
 import kafka.javaapi.FetchResponse;
 import kafka.javaapi.consumer.SimpleConsumer;
+import kafka.javaapi.message.ByteBufferMessageSet;
 import kafka.message.MessageAndOffset;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import storm.kafka.DynamicPartitionConnections;
+import storm.kafka.FetchHandler;
 import storm.kafka.GlobalPartitionId;
 import storm.kafka.KafkaUtils;
 import storm.kafka.metric.KafkaOffsetMetric;
@@ -91,29 +94,40 @@ public class TransactionalTridentKafkaSpout implements IPartitionedTridentSpout<
 
         @Override
         public void emitPartitionBatch(TransactionAttempt attempt, TridentCollector collector, GlobalPartitionId partition, Map meta) {
-            LOG.info("Spout#emitPartitionBatch");
             String instanceId = (String) meta.get("instanceId");
-            if(!_config.forceFromStart || instanceId.equals(_topologyInstanceId)) {
+            if (!_config.forceFromStart || instanceId.equals(_topologyInstanceId)) {
                 SimpleConsumer consumer = _connections.register(partition);
                 long offset = (Long) meta.get("offset");
                 long nextOffset = (Long) meta.get("nextOffset");
-                long start = System.nanoTime();
 
-                FetchRequest fetchRequest = new FetchRequestBuilder()
-                        .clientId(KafkaUtils.makeClientName(_config.topic, partition.partition))
-                        .addFetch(_config.topic, partition.partition, offset, _config.fetchSizeBytes)
-                        .build();
-                FetchResponse fetchResponse = consumer.fetch(fetchRequest);
+                LOG.info("re-emitting batch txid: {}, partition: {}, offset: {}, nextOffset: {}", attempt, partition, offset, nextOffset);
 
-                long end = System.nanoTime();
-                long millis = (end - start) / 1000000;
-                _kafkaMeanFetchLatencyMetric.update(millis);
-                _kafkaMaxFetchLatencyMetric.update(millis);
+                FetchResponse fetchResponse = KafkaUtils.fetch(consumer, _config, partition, offset, new FetchHandler() {
+                    @Override
+                    public void updateMetrics(long latency) {
+                        _kafkaMeanFetchLatencyMetric.update(latency);
+                        _kafkaMaxFetchLatencyMetric.update(latency);
+                    }
+                });
 
-                for (MessageAndOffset msg : fetchResponse.messageSet(_config.topic, partition.partition)) {
+                if (fetchResponse.hasError()) {
+                    short code = fetchResponse.errorCode(_config.topic, partition.partition);
+
+                    LOG.error("Error fetching data from the Broker when re-emitting: {}, Reason: {}", partition, ErrorMapping.exceptionFor(code));
+
+                    // TODO: update consumer to new leader and replicas, then return new last meta.
+                }
+
+                ByteBufferMessageSet msgSet = fetchResponse.messageSet(_config.topic, partition.partition);
+
+                if (msgSet.validBytes() != msgSet.sizeInBytes()) {
+                    LOG.warn("Fetched data with no error, valid bytes({}) is not same as size in bytes({}) on {}.", msgSet.validBytes(), msgSet.sizeInBytes(), partition);
+                }
+
+                for (MessageAndOffset msg : msgSet) {
                     if (offset == nextOffset) break;
                     if (offset > nextOffset) {
-                        throw new RuntimeException("Error when re-emitting batch. overshot the end offset");
+                        LOG.error("Error when re-emitting batch. overshot the end offset, offset: {}, nextOffset: {}", offset, nextOffset);
                     }
                     TridentUtils.emit(_config, collector, msg.message());
                     offset = msg.offset();
@@ -133,6 +147,7 @@ public class TransactionalTridentKafkaSpout implements IPartitionedTridentSpout<
 
         @Override
         public void refreshPartitions(List<GlobalPartitionId> list) {
+            LOG.info("refreshPartitions");
             _connections.clear();
             _kafkaOffsetMetric.refreshPartitions(new HashSet<GlobalPartitionId>(list));
         }
