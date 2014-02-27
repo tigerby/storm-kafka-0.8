@@ -12,7 +12,6 @@ import kafka.javaapi.consumer.SimpleConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import storm.kafka.trident.FailedFetchException;
-import storm.kafka.trident.TridentKafkaConfig;
 
 import java.net.ConnectException;
 import java.util.ArrayList;
@@ -30,7 +29,7 @@ public class KafkaUtils {
 
     public static final Logger LOG = LoggerFactory.getLogger(KafkaUtils.class);
 
-    public static PartitionMetadata findLeader(List<HostPort> seedBrokers, String topic, int partition) {
+    public static PartitionMetadata getPartitionMetadata(List<HostPort> seedBrokers, String topic, int partition) {
         PartitionMetadata returnMetaData = null;
         for (HostPort seed : seedBrokers) {
             SimpleConsumer consumer = null;
@@ -71,13 +70,13 @@ public class KafkaUtils {
         return replicaBrokers;
     }
 
-    public static HostPort findNewLeader(List<HostPort> replicaBrokers, HostPort oldLeader, String topic, int partition) {
+    public static PartitionMetadata recoverPartitionMetadata(List<HostPort> replicaBrokers, HostPort oldLeader, String topic, int partition) {
         // TODO: property retry count.
         for (int i = 0; i < 10; i++) {
             LOG.info("trying to find new leader: {} times", i + 1);
 
             boolean goToSleep;
-            PartitionMetadata metadata = findLeader(replicaBrokers, topic, partition);
+            PartitionMetadata metadata = getPartitionMetadata(replicaBrokers, topic, partition);
             if (metadata == null) {
                 goToSleep = true;
             } else if (metadata.leader() == null) {
@@ -87,9 +86,7 @@ public class KafkaUtils {
                 // second time, assume the broker did recover before failover, or it was a non-Broker issue
                 goToSleep = true;
             } else {
-                HostPort newLeader = new HostPort(metadata.leader().host(), metadata.leader().port());
-                LOG.info("New leader found is {}", newLeader);
-                return newLeader;
+                return metadata;
             }
 
             if (goToSleep) {
@@ -117,7 +114,7 @@ public class KafkaUtils {
         return offsets[0];
     }
 
-    public static FetchResponse fetch(SimpleConsumer consumer, TridentKafkaConfig config, GlobalPartitionId partition, long offset, FetchHandler handler) {
+    public static FetchResponse fetch(SimpleConsumer consumer, KafkaConfig config, GlobalPartitionId partition, long offset, FetchHandler handler) {
         FetchResponse fetchResponse;
         try {
             long start = System.nanoTime();

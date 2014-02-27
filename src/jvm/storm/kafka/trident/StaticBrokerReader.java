@@ -18,7 +18,7 @@ public class StaticBrokerReader implements IBrokerReader {
     public StaticBrokerReader(TridentKafkaConfig config) {
         List<PartitionMetadata> allPartitionMetadata = new ArrayList<PartitionMetadata>();
         for (int i = 0; i < config.partitions; i++) {
-            PartitionMetadata metadata = KafkaUtils.findLeader(((StaticHosts) config.hosts).hosts, config.topic, i);
+            PartitionMetadata metadata = KafkaUtils.getPartitionMetadata(((StaticHosts) config.hosts).hosts, config.topic, i);
             if (metadata != null) {
                 Broker leader = metadata.leader();
                 brokers.add(new GlobalPartitionId(new HostPort(leader.host(), leader.port()), i));

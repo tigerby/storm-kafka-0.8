@@ -8,11 +8,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import kafka.cluster.Broker;
 import kafka.javaapi.PartitionMetadata;
-import kafka.javaapi.TopicMetadata;
-import kafka.javaapi.TopicMetadataRequest;
-import kafka.javaapi.consumer.SimpleConsumer;
 import storm.kafka.KafkaConfig.StaticHosts;
 
 public class StaticCoordinator implements PartitionCoordinator {
@@ -28,7 +24,7 @@ public class StaticCoordinator implements PartitionCoordinator {
 
         List<PartitionMetadata> allPartitionMetadata = new ArrayList<PartitionMetadata>();
         for (int i = 0; i < config.partitions; i++) {
-            PartitionMetadata metadata = KafkaUtils.findLeader(hosts.hosts, config.topic, i);
+            PartitionMetadata metadata = KafkaUtils.getPartitionMetadata(hosts.hosts, config.topic, i);
             if (metadata != null) {
                 allPartitionMetadata.add(metadata);
             }

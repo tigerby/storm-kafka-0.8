@@ -83,6 +83,8 @@ public class TridentUtils {
                 lastMeta.put("nextOffset", lastOffset);
                 return lastMeta;
             }
+
+            // TODO: update consumer to new leader and replicas, then return new last meta.
         }
 
         ByteBufferMessageSet msgSet = fetchResponse.messageSet(config.topic, partition.partition);
