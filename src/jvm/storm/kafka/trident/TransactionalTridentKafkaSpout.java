@@ -9,8 +9,10 @@ import backtype.storm.tuple.Fields;
 
 import java.util.*;
 
+import com.google.common.collect.ImmutableMap;
 import kafka.api.FetchRequest;
 import kafka.api.FetchRequestBuilder;
+import kafka.api.OffsetRequest;
 import kafka.common.ErrorMapping;
 import kafka.javaapi.FetchResponse;
 import kafka.javaapi.consumer.SimpleConsumer;
@@ -84,7 +86,6 @@ public class TransactionalTridentKafkaSpout implements IPartitionedTridentSpout<
 
         @Override
         public Map emitPartitionBatchNew(TransactionAttempt attempt, TridentCollector collector, GlobalPartitionId partition, Map lastMeta) {
-            LOG.info("Spout#emitPartitionBatchNew");
 //            LOG.info("[{}] {}, {}, {}", _context.getThisTaskId(), attempt, partition, lastMeta);
             SimpleConsumer consumer = _connections.register(partition);
             Map ret = TridentUtils.emitPartitionBatchNew(_config, consumer, partition, collector, lastMeta, _topologyInstanceId, _topologyName, _kafkaMeanFetchLatencyMetric, _kafkaMaxFetchLatencyMetric);
@@ -119,10 +120,6 @@ public class TransactionalTridentKafkaSpout implements IPartitionedTridentSpout<
                 }
 
                 ByteBufferMessageSet msgSet = fetchResponse.messageSet(_config.topic, partition.partition);
-
-                if (msgSet.validBytes() != msgSet.sizeInBytes()) {
-                    LOG.warn("Fetched data with no error, valid bytes({}) is not same as size in bytes({}) on {}.", msgSet.validBytes(), msgSet.sizeInBytes(), partition);
-                }
 
                 for (MessageAndOffset msg : msgSet) {
                     if (offset == nextOffset) break;

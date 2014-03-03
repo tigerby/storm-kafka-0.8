@@ -101,10 +101,6 @@ public class TridentUtils {
 
         ByteBufferMessageSet msgSet = fetchResponse.messageSet(config.topic, partition.partition);
 
-        if(msgSet.validBytes() != msgSet.sizeInBytes()) {
-            LOG.warn("Fetched data with no error, valid bytes({}) is not same as size in bytes({}) on {}.", msgSet.validBytes(), msgSet.sizeInBytes(), partition);
-        }
-
         long readOffset = offset;
         for (MessageAndOffset msg : msgSet) {
             long currentOffset = msg.offset();

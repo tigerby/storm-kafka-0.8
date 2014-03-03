@@ -178,10 +178,6 @@ public class PartitionManager {
 
         ByteBufferMessageSet msgSet = fetchResponse.messageSet(_spoutConfig.topic, partitionId.partition);
 
-        if(msgSet.validBytes() != msgSet.sizeInBytes()) {
-            LOG.warn("Fetched data with no error, valid bytes({}) is not same as size in bytes({}) on {}.", msgSet.validBytes(), msgSet.sizeInBytes(), partitionId.partition);
-        }
-
         int numMessages = msgSet.sizeInBytes();
 
         _fetchAPICallCount.incr();
