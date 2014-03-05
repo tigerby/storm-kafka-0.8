@@ -38,9 +38,9 @@ public class KafkaOffsetMetric implements IMetric {
     @Override
     public Object getValueAndReset() {
         try {
-            long totalSpoutLag = 0;
-            long totalLatestTimeOffset = 0;
-            long totalLatestEmittedOffset = 0;
+//            long totalSpoutLag = 0;
+//            long totalLatestTimeOffset = 0;
+//            long totalLatestEmittedOffset = 0;
             HashMap ret = new HashMap();
             if (_partitions != null && _partitions.size() == _partitionToOffset.size()) {
                 for (Map.Entry<GlobalPartitionId, Long> e : _partitionToOffset.entrySet()) {
@@ -67,14 +67,14 @@ public class KafkaOffsetMetric implements IMetric {
                     ret.put(partition.getId() + "/" + "latestTime", latestTimeOffset);
                     ret.put(partition.getId() + "/" + "latestEmittedOffset", latestEmittedOffset);
 
-                    totalSpoutLag += spoutLag;
-                    totalLatestTimeOffset += latestTimeOffset;
-                    totalLatestEmittedOffset += latestEmittedOffset;
+//                    totalSpoutLag += spoutLag;
+//                    totalLatestTimeOffset += latestTimeOffset;
+//                    totalLatestEmittedOffset += latestEmittedOffset;
                 }
 
-                ret.put("totalSpoutLag", totalSpoutLag);
-                ret.put("totalLatestTime", totalLatestTimeOffset);
-                ret.put("totalLatestEmittedOffset", totalLatestEmittedOffset);
+//                ret.put("totalSpoutLag", totalSpoutLag);
+//                ret.put("totalLatestTime", totalLatestTimeOffset);
+//                ret.put("totalLatestEmittedOffset", totalLatestEmittedOffset);
                 return ret;
             } else {
                 TridentUtils.LOG.info("Metrics Tick: Not enough data to calculate spout lag.");
