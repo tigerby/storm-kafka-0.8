@@ -199,8 +199,7 @@ public class PartitionManager {
             _emittedToOffset = msg.nextOffset();
         }
         if (numMessages > 0) {
-            LOG.info("Added {} byte messages from Kafka: {} to internal buffers", numMessages,
-                    partitionId);
+            LOG.debug("Added {} byte messages from Kafka: {} to internal buffers", numMessages, partitionId);
         }
         return true;
     }
