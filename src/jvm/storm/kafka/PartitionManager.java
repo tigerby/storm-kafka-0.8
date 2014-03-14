@@ -55,11 +55,12 @@ public class PartitionManager {
     ZkState _state;
     Map _stormConf;
     List<HostPort> replicaBrokers = new ArrayList<HostPort>();
+    PartitionCoordinator coordinator;
 
 
     public PartitionManager(DynamicPartitionConnections connections, String topologyInstanceId,
                             ZkState state, Map stormConf, SpoutConfig spoutConfig,
-                            GlobalPartitionId id, List<HostPort> replicaBrokers) {
+                            GlobalPartitionId id, List<HostPort> replicaBrokers, PartitionCoordinator coordinator) {
         partitionId = id;
         _connections = connections;
         _spoutConfig = spoutConfig;
@@ -68,6 +69,7 @@ public class PartitionManager {
         _state = state;
         _stormConf = stormConf;
         this.replicaBrokers = replicaBrokers;
+        this.coordinator = coordinator;
 
         String jsonTopologyId = null;
         Long jsonOffset = null;
@@ -112,21 +114,8 @@ public class PartitionManager {
 
     //returns false if it's reached the end of current batch
     public EmitState next(SpoutOutputCollector collector) {
-        if (_waitingToEmit.isEmpty()) {
-            int numOfError = 0;
+        if (_waitingToEmit.isEmpty()) fill();
 
-            // TODO: property number.retry
-            while (!fill()) {
-                numOfError++;
-                LOG.warn("Fetching from Kafka: {} from offset {}. retry: {}", partitionId,
-                        _emittedToOffset, numOfError);
-
-                if (numOfError > 5) {
-                    LOG.error("Cannot find leader. partition: {}.", partitionId);
-                }
-            }
-
-        }
         while (true) {
             MessageAndRealOffset toEmit = _waitingToEmit.pollFirst();
             if (toEmit == null) {
@@ -150,7 +139,7 @@ public class PartitionManager {
         }
     }
 
-    private boolean fill() {
+    private void fill() {
         FetchResponse fetchResponse = KafkaUtils.fetch(_consumer, _spoutConfig, partitionId, _emittedToOffset, new FetchHandler() {
             @Override
             public void updateMetrics(long latency) {
@@ -159,21 +148,26 @@ public class PartitionManager {
             }
         });
 
+        if(fetchResponse == null) {
+            LOG.error("Error fetching data from the Broker: {}, Reason: fetch response is null", partitionId);
+            updateConsumer();
+            return;
+        }
+
         if (fetchResponse.hasError()) {
             short code = fetchResponse.errorCode(_spoutConfig.topic, partitionId.partition);
 
-            LOG.warn("Error fetching data from the Broker: {}, Reason: {}", partitionId, ErrorMapping.exceptionFor(code));
+            LOG.error("Error fetching data from the Broker: {}, Reason: {}", partitionId, ErrorMapping.exceptionFor(code));
 
             if (code == ErrorMapping.OffsetOutOfRangeCode()) {
                 // We asked for an invalid offset. For simple case ask for the last element to reset
                 _emittedToOffset = KafkaUtils.getLastOffset(_consumer, _spoutConfig.topic, partitionId.partition, kafka.api.OffsetRequest.LatestTime(),
                         KafkaUtils.makeClientName(_spoutConfig.topic, partitionId.partition));
-                return false;
+                return;
             }
 
             updateConsumer();
-
-            return false;
+            return;
         }
 
         ByteBufferMessageSet msgSet = fetchResponse.messageSet(_spoutConfig.topic, partitionId.partition);
@@ -201,13 +195,16 @@ public class PartitionManager {
         if (numMessages > 0) {
             LOG.debug("Added {} byte messages from Kafka: {} to internal buffers", numMessages, partitionId);
         }
-        return true;
     }
 
     private void updateConsumer() {
-        PartitionMetadata metadata = KafkaUtils.recoverPartitionMetadata(replicaBrokers, partitionId.host, _spoutConfig.topic, partitionId.partition);
+        LOG.info("reset this partition: {}", partitionId);
+
+        PartitionMetadata metadata = KafkaUtils.getPartitionMetadata(replicaBrokers, _spoutConfig.topic, partitionId.partition);
         HostPort newLeader = new HostPort(metadata.leader().host(), metadata.leader().port());
-        LOG.info("New leader found is {}", newLeader);
+
+        // update global partition ID of coordinator
+        coordinator.updatePartitionId(partitionId, new GlobalPartitionId(newLeader, partitionId.partition));
 
         // update metadata
         _connections.unregister(partitionId.host, partitionId.partition);
@@ -216,6 +213,8 @@ public class PartitionManager {
         partitionId.host = newLeader;
         _consumer = _connections.register(newLeader, partitionId.partition);
         replicaBrokers = KafkaUtils.replicas(metadata);
+
+        LOG.info("New leader found is {}. partition: {}", newLeader, partitionId.partition);
     }
 
     public void ack(Long offset) {

@@ -11,9 +11,7 @@ import kafka.javaapi.*;
 import kafka.javaapi.consumer.SimpleConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import storm.kafka.trident.FailedFetchException;
 
-import java.net.ConnectException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -51,13 +49,17 @@ public class KafkaUtils {
                     }
                 }
             } catch (Exception e) {
-                LOG.error("Error communicating with Broker [{}] to find Leader for [{}, {}] Reason: ", seed, topic, partition, e);
+                LOG.warn("Cannot communicating with Broker {} to get partition metadata for {}:{} Reason: {}", seed, topic, partition, e.getMessage());
             } finally {
                 if (consumer != null) {
                     consumer.close();
                 }
             }
+
+            if(returnMetaData != null) break;
         }
+
+        if(returnMetaData == null) LOG.error("Partition metadata does not existed. [{}, {}]", topic, partition);
 
         return returnMetaData;
     }
@@ -70,33 +72,17 @@ public class KafkaUtils {
         return replicaBrokers;
     }
 
+    @Deprecated
     public static PartitionMetadata recoverPartitionMetadata(List<HostPort> replicaBrokers, HostPort oldLeader, String topic, int partition) {
-        // TODO: property retry count.
-        for (int i = 0; i < 10; i++) {
-            LOG.info("trying to find new leader: {} times", i + 1);
+        LOG.info("trying to find new leader.");
 
-            boolean goToSleep;
-            PartitionMetadata metadata = getPartitionMetadata(replicaBrokers, topic, partition);
-            if (metadata == null) {
-                goToSleep = true;
-            } else if (metadata.leader() == null) {
-                goToSleep = true;
-            } else if (!oldLeader.host.equals(metadata.leader().host()) && i == 0) {
-                // first time through if the leader hasn't changed give ZooKeeper a second to recover
-                // second time, assume the broker did recover before failover, or it was a non-Broker issue
-                goToSleep = true;
-            } else {
-                return metadata;
-            }
-
-            if (goToSleep) {
-                try {
-                    Thread.sleep(1000);
-                } catch (InterruptedException ie) {
-                }
-            }
+        PartitionMetadata metadata = getPartitionMetadata(replicaBrokers, topic, partition);
+        if (metadata != null && metadata.leader() != null &&
+                !(oldLeader.host.equals(metadata.leader().host()) && oldLeader.port == metadata.leader().port())) {
+            return metadata;
         }
-        throw new RuntimeException("Unable to find new leader after Broker failure. Exiting");
+
+        return null;
     }
 
     public static long getLastOffset(SimpleConsumer consumer, String topic, int partition, long whichTime, String clientName) {
@@ -104,10 +90,17 @@ public class KafkaUtils {
         Map<TopicAndPartition, PartitionOffsetRequestInfo> requestInfo = new HashMap<TopicAndPartition, PartitionOffsetRequestInfo>();
         requestInfo.put(topicAndPartition, new PartitionOffsetRequestInfo(whichTime, 1));
         kafka.javaapi.OffsetRequest request = new kafka.javaapi.OffsetRequest(requestInfo, OffsetRequest.CurrentVersion(), clientName);
-        OffsetResponse response = consumer.getOffsetsBefore(request);
+
+        OffsetResponse response = null;
+        try {
+            response = consumer.getOffsetsBefore(request);
+        } catch (Exception e) {
+            LOG.error("Error occured when getting last offset. Reason: {}\nset offset 0.", e.getMessage());
+            return 0;
+        }
 
         if (response.hasError()) {
-            LOG.error("Error fetching data Offset Data the Broker. Reason: {}, set Offset to 0.", ErrorMapping.exceptionFor(response.errorCode(topic, partition)));
+            LOG.error("Error occured when getting last offset. Reason: {}\nset offset 0.", ErrorMapping.exceptionFor(response.errorCode(topic, partition)));
             return 0;
         }
         long[] offsets = response.offsets(topic, partition);
@@ -129,11 +122,8 @@ public class KafkaUtils {
 
             handler.updateMetrics(millis);
         } catch (Exception e) {
-            if (e instanceof ConnectException) {
-                throw new FailedFetchException(e);
-            } else {
-                throw new RuntimeException(e);
-            }
+            LOG.error("Error occured while fetching data. partition: {}, offset: {}, Reason: {}", partition, offset, e.getMessage());
+            return null;
         }
 
         return fetchResponse;

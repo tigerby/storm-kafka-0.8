@@ -89,7 +89,7 @@ public class ZkCoordinator implements PartitionCoordinator {
             LOG.info("New partition managers: " + newPartitions.toString());
             
             for(GlobalPartitionId id: newPartitions) {
-                PartitionManager man = new PartitionManager(_connections, _topologyInstanceId, _state, _stormConf, _spoutConfig, id, null);
+                PartitionManager man = new PartitionManager(_connections, _topologyInstanceId, _state, _stormConf, _spoutConfig, id, null, this);
                 _managers.put(id, man);
             }
             
@@ -104,7 +104,12 @@ public class ZkCoordinator implements PartitionCoordinator {
     public PartitionManager getManager(GlobalPartitionId id) {
         return _managers.get(id);        
     }
-    
+
+    @Override
+    public void updatePartitionId(GlobalPartitionId oldId, GlobalPartitionId newId) {
+
+    }
+
     private boolean myOwnership(GlobalPartitionId id) {
         int val = Math.abs(id.host.hashCode() + 23 * id.partition);        
         return val % _totalTasks == _taskIndex;

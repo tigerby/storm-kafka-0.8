@@ -39,7 +39,7 @@ public class StaticCoordinator implements PartitionCoordinator {
 
             managers.put(new GlobalPartitionId(hostPort, metadata.partitionId()),
                     new PartitionManager(connections, topologyInstanceId, state, stormConf, config,
-                            myPartition, replicas));
+                            myPartition, replicas, this));
 
         }
     }
@@ -51,5 +51,10 @@ public class StaticCoordinator implements PartitionCoordinator {
 
     public PartitionManager getManager(GlobalPartitionId id) {
         return managers.get(id);
+    }
+
+    public void updatePartitionId(GlobalPartitionId oldId, GlobalPartitionId newId) {
+        PartitionManager partitionManager = managers.remove(oldId);
+        managers.put(newId, partitionManager);
     }
 }
