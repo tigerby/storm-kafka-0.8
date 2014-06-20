@@ -201,6 +201,9 @@ public class PartitionManager {
         LOG.info("reset this partition: {}", partitionId);
 
         PartitionMetadata metadata = KafkaUtils.getPartitionMetadata(replicaBrokers, _spoutConfig.topic, partitionId.partition);
+
+        if(metadata == null) return;
+
         HostPort newLeader = new HostPort(metadata.leader().host(), metadata.leader().port());
 
         // update global partition ID of coordinator
